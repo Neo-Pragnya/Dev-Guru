@@ -1,0 +1,822 @@
+/* Dev Guru explorer. Offline and view-only: reads the embedded view model, never fetches, never executes.
+   Untrusted text (paths, names, docs, source) is only ever assigned through textContent or attributes. */
+(() => {
+  "use strict";
+  const D = JSON.parse(document.getElementById("dg-data").textContent);
+  const M = JSON.parse(document.getElementById("dg-manifest").textContent);
+  const $ = (s) => document.querySelector(s);
+  const NS = "http://www.w3.org/2000/svg";
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function el(tag, attrs, ...kids) {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (v === undefined || v === null || v === false) continue;
+      if (k === "text") n.textContent = String(v);
+      else if (k === "class") n.className = v;
+      else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+      else n.setAttribute(k, v === true ? "" : String(v));
+    }
+    for (const kid of kids.flat()) if (kid !== null && kid !== undefined && kid !== false) n.append(kid instanceof Node ? kid : document.createTextNode(String(kid)));
+    return n;
+  }
+  function sv(tag, attrs) {
+    const n = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (v === undefined || v === null) continue;
+      if (k === "text") n.textContent = String(v);
+      else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+      else n.setAttribute(k, String(v));
+    }
+    return n;
+  }
+  const fmt = (n) => Number(n).toLocaleString("en");
+  const short = (p) => (p.length > 34 ? "…" + p.slice(-33) : p);
+
+  // ------------------------------------------------------------------ indices
+  const files = new Map(D.files.map((f) => [f.id, f]));
+  const syms = new Map(D.symbols.map((s) => [s.id, s]));
+  const nodeOf = (id) => files.get(id) || syms.get(id);
+  const fileOf = (id) => (files.has(id) ? id : syms.get(id)?.file || null);
+  const out = new Map(), inn = new Map(), callOut = new Map(), callIn = new Map(), inhOut = new Map(), inhIn = new Map();
+  const push = (m, k, v) => { if (!m.has(k)) m.set(k, new Set()); m.get(k).add(v); };
+  for (const e of D.edges) {
+    if (e.k === "imports") { push(out, e.s, e.t); push(inn, e.t, e.s); }
+    else if (e.k === "calls") { push(callOut, e.s, e.t); push(callIn, e.t, e.s); }
+    else if (e.k === "inherits") { push(inhOut, e.s, e.t); push(inhIn, e.t, e.s); }
+  }
+  const get = (m, k) => [...(m.get(k) || [])];
+  const PALETTE = ["#ffb347", "#3dd6c6", "#9b87ff", "#ff6f91", "#b7ef6a", "#6cc3ff", "#ffd36e", "#ff9ec7", "#7ee0a1", "#c79bff"];
+  const pkgIndex = new Map(D.packages.map((p, i) => [p.id, i]));
+  const colorOf = (fid) => PALETTE[(pkgIndex.get(files.get(fid)?.package) ?? 0) % PALETTE.length];
+  const cycleFiles = new Set(D.insights.cycles.flat());
+  const cyclePairs = new Set();
+  for (const cyc of D.insights.cycles) for (const a of cyc) for (const b of get(out, a)) if (cyc.includes(b)) cyclePairs.add(a + "→" + b);
+
+  // ------------------------------------------------------------------ state (shareable through the URL hash)
+  const state = { view: "constellation", sel: null, filters: { imports: true, calls: true, inherits: true }, tour: 0, playing: !reduced };
+  try {
+    const h = new URLSearchParams(location.hash.slice(1));
+    if (h.get("view")) state.view = h.get("view");
+    if (h.get("sel") && nodeOf(h.get("sel"))) state.sel = h.get("sel");
+    if (h.get("theme")) document.documentElement.dataset.theme = h.get("theme") === "day" ? "day" : "night";
+    if (h.get("embed") === "1") document.documentElement.classList.add("embed"); // framed in a page: just tabs and stage
+  } catch (_) { /* ignore a malformed hash */ }
+  function syncHash() {
+    const p = new URLSearchParams();
+    p.set("view", state.view);
+    if (state.sel) p.set("sel", state.sel);
+    if (document.documentElement.dataset.theme === "day") p.set("theme", "day");
+    if (document.documentElement.classList.contains("embed")) p.set("embed", "1");
+    try { history.replaceState(null, "", "#" + p.toString()); } catch (_) { /* file:// in some browsers */ }
+  }
+
+  // ------------------------------------------------------------------ SVG stage with pan and zoom
+  const svg = $("#svg");
+  let world, cam = { x: 0, y: 0, k: 1 };
+  function resetStage() {
+    svg.replaceChildren();
+    const defs = sv("defs");
+    const glow = sv("filter", { id: "glow", x: "-50%", y: "-50%", width: "200%", height: "200%" });
+    glow.append(sv("feGaussianBlur", { stdDeviation: "6" }));
+    defs.append(glow);
+    for (const [id, color] of [["arrow", "var(--muted)"], ["arrowHot", "var(--saffron)"]]) {
+      const m = sv("marker", { id, viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "6", markerHeight: "6", orient: "auto-start-reverse" });
+      m.append(sv("path", { d: "M0,0 L10,5 L0,10 z", fill: color }));
+      defs.append(m);
+    }
+    svg.append(defs);
+    world = sv("g", { class: "world" });
+    svg.append(world);
+    svg.classList.remove("dim");
+    applyCam();
+  }
+  const applyCam = () => world && world.setAttribute("transform", `translate(${cam.x},${cam.y}) scale(${cam.k})`);
+  function fit(pad = 40, box) {
+    if (!world) return;
+    const b = box || world.getBBox();
+    const w = svg.clientWidth || 800, h = svg.clientHeight || 600;
+    if (!b.width || !b.height) { cam = { x: w / 2, y: h / 2, k: 1 }; applyCam(); return; }
+    const k = Math.min((w - pad * 2) / b.width, (h - pad * 2) / b.height, 2.2);
+    cam = { k, x: w / 2 - (b.x + b.width / 2) * k, y: h / 2 - (b.y + b.height / 2) * k };
+    animateCam();
+  }
+  let camAnim = null;
+  function animateCam() {
+    if (reduced) return applyCam();
+    const from = parseCam(), to = { ...cam }, t0 = performance.now(), dur = 520;
+    cancelAnimationFrame(camAnim);
+    const step = (t) => {
+      const p = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - p, 3);
+      world.setAttribute("transform", `translate(${from.x + (to.x - from.x) * e},${from.y + (to.y - from.y) * e}) scale(${from.k + (to.k - from.k) * e})`);
+      if (p < 1) camAnim = requestAnimationFrame(step);
+    };
+    camAnim = requestAnimationFrame(step);
+  }
+  function parseCam() {
+    const m = /translate\(([-\d.e]+),([-\d.e]+)\) scale\(([-\d.e]+)\)/.exec(world?.getAttribute("transform") || "");
+    return m ? { x: +m[1], y: +m[2], k: +m[3] } : { ...cam };
+  }
+  function zoomBy(f, cx, cy) {
+    const w = svg.clientWidth, h = svg.clientHeight;
+    cx = cx ?? w / 2; cy = cy ?? h / 2;
+    const k = Math.max(0.08, Math.min(6, cam.k * f));
+    cam.x = cx - ((cx - cam.x) * k) / cam.k; cam.y = cy - ((cy - cam.y) * k) / cam.k; cam.k = k;
+    applyCam();
+  }
+  svg.addEventListener("wheel", (e) => { e.preventDefault(); const r = svg.getBoundingClientRect(); zoomBy(e.deltaY < 0 ? 1.12 : 1 / 1.12, e.clientX - r.left, e.clientY - r.top); }, { passive: false });
+  let drag = null;
+  svg.addEventListener("pointerdown", (e) => { if (e.button !== 0) return; drag = { x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y, moved: false }; svg.setPointerCapture(e.pointerId); });
+  svg.addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (Math.abs(dx) + Math.abs(dy) > 4) { drag.moved = true; svg.classList.add("dragging"); }
+    if (drag.moved) { cam.x = drag.cx + dx; cam.y = drag.cy + dy; applyCam(); }
+  });
+  svg.addEventListener("pointerup", () => { svg.classList.remove("dragging"); setTimeout(() => (drag = null), 0); });
+  $("#zoomIn").onclick = () => zoomBy(1.25);
+  $("#zoomOut").onclick = () => zoomBy(1 / 1.25);
+  $("#fitBtn").onclick = () => fit();
+
+  // pulses that travel along highlighted paths
+  let pulseTimer = null;
+  function pulses(paths) {
+    cancelAnimationFrame(pulseTimer);
+    world?.querySelectorAll(".pulse").forEach((p) => p.remove());
+    if (reduced || !paths.length) return;
+    const dots = paths.slice(0, 60).map((p, i) => ({ p, len: p.getTotalLength(), off: (i * 0.17) % 1, c: world.appendChild(sv("circle", { r: 3, class: "pulse" })) }));
+    const t0 = performance.now();
+    const step = (t) => {
+      for (const d of dots) {
+        if (!d.c.isConnected) return;
+        const f = ((t - t0) / 1400 + d.off) % 1, pt = d.p.getPointAtLength(f * d.len);
+        d.c.setAttribute("cx", pt.x); d.c.setAttribute("cy", pt.y); d.c.setAttribute("opacity", Math.sin(f * Math.PI));
+      }
+      pulseTimer = requestAnimationFrame(step);
+    };
+    pulseTimer = requestAnimationFrame(step);
+  }
+  const curve = (a, b, bend = 0.18) => {
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, dx = b.x - a.x, dy = b.y - a.y;
+    return `M${a.x},${a.y} Q${mx - dy * bend},${my + dx * bend} ${b.x},${b.y}`;
+  };
+
+  // ------------------------------------------------------------------ constellation layout (deterministic)
+  let constellation = null;
+  function layoutConstellation() {
+    if (constellation) return constellation;
+    const pos = new Map(), radius = new Map(), centers = [];
+    const GOLD = Math.PI * (3 - Math.sqrt(5));
+    // 1. each package: files on a sunflower around its own origin, then separate any overlaps locally
+    const local = new Map();
+    for (const p of D.packages) {
+      const ids = [...p.files].sort((x, y) => (files.get(y).loc - files.get(x).loc) || x.localeCompare(y));
+      ids.forEach((fid) => radius.set(fid, Math.max(4.5, Math.min(22, 3 + Math.sqrt(files.get(fid).loc || 1) * 0.8))));
+      const mean = ids.reduce((s, f) => s + radius.get(f), 0) / ids.length;
+      const pts = ids.map((fid, j) => ({ fid, x: Math.cos(j * GOLD) * (mean * 2 + 8) * 0.62 * Math.sqrt(j), y: Math.sin(j * GOLD) * (mean * 2 + 8) * 0.62 * Math.sqrt(j) }));
+      if (pts.length <= 400) for (let it = 0; it < 30; it++) {
+        for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) {
+          const a = pts[i], b = pts[j], min = radius.get(a.fid) + radius.get(b.fid) + 5;
+          let dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
+          if (d < min) { if (d < 0.01) { dx = 0.6; dy = 0.8; d = 1; } const k = (min - d) / 2 / d; a.x -= dx * k; a.y -= dy * k; b.x += dx * k; b.y += dy * k; }
+        }
+      }
+      const R = Math.max(26, ...pts.map((q) => Math.hypot(q.x, q.y) + radius.get(q.fid))) + 16;
+      local.set(p.id, { pts, R });
+    }
+    // 2. pack packages largest-first along a spiral, never overlapping
+    const order = [...D.packages].sort((a, b) => local.get(b.id).R - local.get(a.id).R || a.id.localeCompare(b.id));
+    for (const p of order) {
+      const R = local.get(p.id).R;
+      let x = 0, y = 0;
+      if (centers.length) {
+        for (let s = 0, a = 0, d = 0; s < 20000; s++, a += 0.32, d += 1.4) {
+          x = Math.cos(a) * d; y = Math.sin(a) * d * 0.82;
+          if (centers.every((c) => Math.hypot(c.x - x, c.y - y) >= c.r + R + 12)) break;
+        }
+      }
+      centers.push({ id: p.id, x, y, r: R });
+      for (const q of local.get(p.id).pts) pos.set(q.fid, { x: x + q.x, y: y + q.y });
+    }
+    constellation = { pos, radius, centers };
+    return constellation;
+  }
+
+  function drawConstellation({ highlight } = {}) {
+    resetStage();
+    const { pos, radius, centers } = layoutConstellation();
+    const gp = sv("g"), ge = sv("g"), gn = sv("g");
+    world.append(gp, ge, gn);
+    const bigR = [...centers].sort((a, b) => b.r - a.r)[Math.min(11, centers.length - 1)]?.r ?? 0;
+    for (const c of centers) {
+      gp.append(sv("circle", { class: "pkg-halo", cx: c.x, cy: c.y, r: c.r }));
+      if (c.r >= bigR || centers.length <= 12) gp.append(sv("text", { class: "pkg-label", x: c.x, y: c.y - c.r - 6, "text-anchor": "middle", text: c.id === "." ? "(root)" : c.id.split("/").slice(-2).join("/") }));
+    }
+    const edgeEls = [];
+    if (state.filters.imports) for (const e of D.edges) {
+      if (e.k !== "imports") continue;
+      const a = pos.get(e.s), b = pos.get(e.t);
+      if (!a || !b) continue;
+      const path = sv("path", { class: "edge imports" + (cyclePairs.has(e.s + "→" + e.t) ? " cycle" : ""), d: curve(a, b), "marker-end": "url(#arrow)" });
+      path.dataset.s = e.s; path.dataset.t = e.t;
+      ge.append(path); edgeEls.push(path);
+    }
+    const nodeEls = new Map();
+    for (const f of D.files) {
+      const p = pos.get(f.id), r = radius.get(f.id), color = colorOf(f.id);
+      const g = sv("g", { class: "node", transform: `translate(${p.x},${p.y})`, tabindex: "-1" });
+      g.append(sv("circle", { class: "halo", r: r + 7, fill: color, filter: "url(#glow)" }));
+      g.append(sv("circle", { class: "core", r, fill: color }));
+      if (r > 9 || f.entry || f.fan_in >= 3) g.append(sv("text", { x: r + 4, y: 4, text: f.name }));
+      g.dataset.id = f.id;
+      g.addEventListener("mouseenter", () => hoverFile(f.id));
+      g.addEventListener("mouseleave", () => hoverFile(null));
+      g.addEventListener("click", () => { if (!drag?.moved) select(f.id); });
+      gn.append(g); nodeEls.set(f.id, g);
+    }
+    function hoverFile(fid) {
+      const focus = fid || (state.sel && fileOf(state.sel)) || highlight;
+      svg.classList.toggle("dim", !!focus);
+      nodeEls.forEach((g) => g.classList.remove("hot"));
+      edgeEls.forEach((p) => p.classList.remove("hot"));
+      if (!focus) { pulses([]); return; }
+      const near = new Set([focus, ...get(out, focus), ...get(inn, focus)]);
+      near.forEach((id) => nodeEls.get(id)?.classList.add("hot"));
+      const hot = edgeEls.filter((p) => p.dataset.s === focus || p.dataset.t === focus);
+      hot.forEach((p) => p.classList.add("hot"));
+      pulses(hot);
+      $("#hint").textContent = `${files.get(focus).path} · imports ${get(out, focus).length} · imported by ${get(inn, focus).length}`;
+    }
+    const selFile = state.sel && fileOf(state.sel);
+    if (selFile) nodeEls.get(selFile)?.classList.add("selected");
+    hoverFile(null);
+    legend([["imports", "rgba(155,135,255,.7)", "import"], ["cycle", "var(--rose)", "import cycle"], ["dot", "", "size = lines · colour = package"]]);
+    return { pos, nodeEls };
+  }
+
+  // ------------------------------------------------------------------ flow: layered dependency map
+  function drawFlow() {
+    resetStage();
+    if (state.flowLevel === undefined) state.flowLevel = D.files.length > 120 ? "packages" : "files";
+    if (state.flowLevel === "packages") return drawPackageFlow();
+    const nodes = D.files.filter((f) => get(out, f.id).length || get(inn, f.id).length).map((f) => f.id);
+    if (!nodes.length) return emptyStage("No imports between workspace files", "Every file stands alone, so there's no flow to draw.");
+    // break cycles with a DFS, then longest-path layering from the importers' side
+    const color = new Map(), back = new Set(), order = [];
+    const visit = (u) => {
+      color.set(u, 1);
+      for (const v of get(out, u).sort()) { if (color.get(v) === 1) back.add(u + "→" + v); else if (!color.get(v)) visit(v); }
+      color.set(u, 2); order.push(u);
+    };
+    nodes.sort().forEach((n) => !color.get(n) && visit(n));
+    const layer = new Map();
+    for (const u of order) { // sinks first: layer = 1 + max(layer of what u imports)
+      let L = 0;
+      for (const v of get(out, u)) if (!back.has(u + "→" + v)) L = Math.max(L, (layer.get(v) ?? 0) + 1);
+      layer.set(u, L);
+    }
+    const maxL = Math.max(...layer.values());
+    const cols = [];
+    for (const [id, L] of layer) (cols[maxL - L] ||= []).push(id);
+    for (const c of cols) c.sort((a, b) => files.get(a).package.localeCompare(files.get(b).package) || a.localeCompare(b));
+    const y = new Map();
+    const place = () => cols.forEach((c) => c.forEach((id, i) => y.set(id, i)));
+    place();
+    for (let sweep = 0; sweep < 4; sweep++) { // barycentre ordering reduces crossings
+      cols.forEach((c, ci) => {
+        if (!ci) return;
+        const bary = (id) => { const ns = [...get(out, id), ...get(inn, id)].filter((n) => y.has(n)); return ns.length ? ns.reduce((s, n) => s + y.get(n), 0) / ns.length : y.get(id); };
+        c.sort((a, b) => bary(a) - bary(b) || a.localeCompare(b));
+      });
+      place();
+    }
+    const W = 210, H = 34, GX = 110, GY = 14;
+    const pos = new Map();
+    cols.forEach((c, ci) => c.forEach((id, i) => pos.set(id, { x: ci * (W + GX), y: i * (H + GY) })));
+    const ge = sv("g"), gn = sv("g");
+    world.append(ge, gn);
+    cols.forEach((c, ci) => world.insertBefore(sv("text", { class: "lane-label", x: ci * (W + GX), y: -16, text: ci === 0 ? "entry side" : ci === cols.length - 1 ? "foundations" : `layer ${ci + 1}` }), ge));
+    const edgeEls = [];
+    for (const [s, ts] of out) for (const t of ts) {
+      const a = pos.get(s), b = pos.get(t);
+      if (!a || !b) continue;
+      const cyc = back.has(s + "→" + t) || cyclePairs.has(s + "→" + t);
+      const x1 = a.x + W, y1 = a.y + H / 2, x2 = b.x, y2 = b.y + H / 2, dx = Math.max(40, Math.abs(x2 - x1) / 2);
+      const d = x2 > x1 ? `M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2},${y2}` : `M${a.x},${y1} C${a.x - 80},${y1 - 60} ${b.x + W + 80},${y2 - 60} ${b.x + W},${y2}`;
+      const p = sv("path", { class: "edge imports" + (cyc ? " cycle" : ""), d, "marker-end": "url(#arrow)" });
+      p.dataset.s = s; p.dataset.t = t;
+      ge.append(p); edgeEls.push(p);
+    }
+    const boxes = new Map();
+    for (const [id, p] of pos) {
+      const f = files.get(id);
+      const g = sv("g", { class: "node box", transform: `translate(${p.x},${p.y})` });
+      g.append(sv("rect", { width: W, height: H, rx: 10, fill: "var(--panel-solid)", stroke: colorOf(id), "stroke-width": cycleFiles.has(id) ? 2.5 : 1.2 }));
+      g.append(sv("circle", { cx: 14, cy: H / 2, r: 5, fill: colorOf(id) }));
+      g.append(sv("text", { x: 26, y: H / 2 + 4, text: short(f.path) }));
+      g.dataset.id = id;
+      g.addEventListener("mouseenter", () => hot(id));
+      g.addEventListener("mouseleave", () => hot(null));
+      g.addEventListener("click", () => { if (!drag?.moved) select(id); });
+      gn.append(g); boxes.set(id, g);
+    }
+    function hot(id) {
+      const focus = id || (state.sel && fileOf(state.sel));
+      svg.classList.toggle("dim", !!focus);
+      boxes.forEach((g) => g.classList.remove("hot")); edgeEls.forEach((p) => p.classList.remove("hot"));
+      if (!focus || !pos.has(focus)) { pulses([]); return; }
+      // everything downstream (what it depends on) and upstream (what depends on it)
+      const walk = (start, m) => { const seen = new Set([start]), q = [start]; while (q.length) for (const n of get(m, q.shift())) if (!seen.has(n)) { seen.add(n); q.push(n); } return seen; };
+      const reach = new Set([...walk(focus, out), ...walk(focus, inn)]);
+      reach.forEach((n) => boxes.get(n)?.classList.add("hot"));
+      const hotEdges = edgeEls.filter((p) => reach.has(p.dataset.s) && reach.has(p.dataset.t));
+      hotEdges.forEach((p) => p.classList.add("hot"));
+      pulses(hotEdges);
+      $("#hint").textContent = `${files.get(focus).path}: ${walk(focus, out).size - 1} downstream · ${walk(focus, inn).size - 1} upstream`;
+    }
+    hot(null);
+    const isolated = D.files.length - nodes.length;
+    legend([["imports", "rgba(155,135,255,.7)", "imports (left → right)"], ["cycle", "var(--rose)", `cycle (${D.insights.cycles.length})`], ["", "", isolated ? `${isolated} file(s) with no imports not shown` : ""]]);
+  }
+
+  function drawPackageFlow() {
+    const pkgOf = (fid) => files.get(fid).package;
+    const weight = new Map();
+    for (const [s, ts] of out) for (const t of ts) { const a = pkgOf(s), b = pkgOf(t); if (a !== b) weight.set(a + "\u0000" + b, (weight.get(a + "\u0000" + b) || 0) + 1); }
+    const pout = new Map(), pin = new Map();
+    for (const k of weight.keys()) { const [a, b] = k.split("\u0000"); push(pout, a, b); push(pin, b, a); }
+    const ids = D.packages.map((p) => p.id).filter((id) => pout.has(id) || pin.has(id));
+    if (!ids.length) return emptyStage("No imports between packages", "Each package stands alone.");
+    const color = new Map(), back = new Set(), order = [];
+    const visit = (u) => { color.set(u, 1); for (const v of get(pout, u).sort()) { if (color.get(v) === 1) back.add(u + "\u0000" + v); else if (!color.get(v)) visit(v); } color.set(u, 2); order.push(u); };
+    ids.sort().forEach((n) => !color.get(n) && visit(n));
+    const layer = new Map();
+    for (const u of order) { let L = 0; for (const v of get(pout, u)) if (!back.has(u + "\u0000" + v)) L = Math.max(L, (layer.get(v) ?? 0) + 1); layer.set(u, L); }
+    const maxL = Math.max(...layer.values()), cols = [];
+    for (const [id, L] of layer) (cols[maxL - L] ||= []).push(id);
+    cols.forEach((c) => c.sort());
+    const W = 230, H = 46, GX = 120, GY = 16, pos = new Map();
+    cols.forEach((c, ci) => c.forEach((id, i) => pos.set(id, { x: ci * (W + GX), y: i * (H + GY) - (c.length * (H + GY)) / 2 })));
+    const ge = sv("g"), gn = sv("g"); world.append(ge, gn);
+    const maxW = Math.max(...weight.values()), edgeEls = [];
+    for (const [k, w] of weight) {
+      const [s, t] = k.split("\u0000"), a = pos.get(s), b = pos.get(t);
+      if (!a || !b) continue;
+      const x1 = a.x + W, y1 = a.y + H / 2, x2 = b.x, y2 = b.y + H / 2, dx = Math.max(50, Math.abs(x2 - x1) / 2);
+      const d = x2 > x1 ? `M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2},${y2}` : `M${a.x},${y1} C${a.x - 90},${y1 - 70} ${b.x + W + 90},${y2 - 70} ${b.x + W},${y2}`;
+      const p = sv("path", { class: "edge imports" + (back.has(k) ? " cycle" : ""), d, "stroke-width": 1 + (5 * w) / maxW });
+      p.dataset.s = s; p.dataset.t = t; ge.append(p); edgeEls.push(p);
+    }
+    const boxes = new Map();
+    for (const [id, p] of pos) {
+      const pk = D.packages.find((x) => x.id === id), col = PALETTE[pkgIndex.get(id) % PALETTE.length];
+      const g = sv("g", { class: "node box", transform: `translate(${p.x},${p.y})` });
+      g.append(sv("rect", { width: W, height: H, rx: 12, fill: "var(--panel-solid)", stroke: col, "stroke-width": 1.5 }));
+      g.append(sv("text", { x: 14, y: 19, text: id === "." ? "(root)" : (id.length > 30 ? "…" + id.slice(-29) : id) }));
+      g.append(sv("text", { x: 14, y: 35, class: "sub", text: `${pk.files.length} files · → ${get(pout, id).length} · ← ${get(pin, id).length}` }));
+      g.addEventListener("mouseenter", () => hot(id)); g.addEventListener("mouseleave", () => hot(null));
+      g.addEventListener("click", () => { if (!drag?.moved) { state.flowLevel = "files"; select(pk.files[0]); } });
+      gn.append(g); boxes.set(id, g);
+    }
+    function hot(id) {
+      svg.classList.toggle("dim", !!id);
+      boxes.forEach((g) => g.classList.remove("hot")); edgeEls.forEach((p) => p.classList.remove("hot"));
+      if (!id) { pulses([]); $("#hint").textContent = `${ids.length} packages · ${weight.size} package dependencies · click a package to see its files`; return; }
+      boxes.get(id)?.classList.add("hot");
+      const hotE = edgeEls.filter((p) => p.dataset.s === id || p.dataset.t === id);
+      hotE.forEach((p) => { p.classList.add("hot"); boxes.get(p.dataset.s)?.classList.add("hot"); boxes.get(p.dataset.t)?.classList.add("hot"); });
+      pulses(hotE);
+      $("#hint").textContent = `${id}: depends on ${get(pout, id).length} packages, used by ${get(pin, id).length}`;
+    }
+    hot(null);
+    legend([["imports", "rgba(155,135,255,.7)", "package imports (thicker = more)"], ["cycle", "var(--rose)", "cycle"]]);
+  }
+
+  // ------------------------------------------------------------------ impact: blast-radius rings
+  function dependents(id) {
+    const symbolLevel = syms.has(id);
+    const methodsOf = (n) => D.symbols.filter((s) => s.kind === "method" && s.file === syms.get(n)?.file && s.name.startsWith(syms.get(n).name + ".")).map((s) => s.id);
+    const next = (n) => symbolLevel ? [...get(callIn, n), ...get(inhIn, n), ...(syms.get(n)?.kind === "class" ? methodsOf(n).flatMap((m) => get(callIn, m)) : [])].filter((x) => x !== n) : [...get(inn, n), ...new Set([...(files.get(n)?.symbols || [])].flatMap((s) => get(callIn, s)).map(fileOf).filter((f) => f && f !== n))];
+    const dist = new Map([[id, 0]]), parent = new Map(), q = [id];
+    while (q.length) { const u = q.shift(); for (const v of next(u)) if (!dist.has(v)) { dist.set(v, dist.get(u) + 1); parent.set(v, u); q.push(v); } }
+    return { dist, parent, symbolLevel };
+  }
+  function drawImpact() {
+    resetStage();
+    const focus = state.sel || D.insights.most_depended[0] || D.files[0].id;
+    const { dist, parent, symbolLevel } = dependents(focus);
+    const rings = [];
+    for (const [id, d] of dist) if (d) (rings[Math.min(d, 4)] ||= []).push(id);
+    const R = 120, pos = new Map([[focus, { x: 0, y: 0 }]]);
+    rings.forEach((ids, d) => {
+      if (!ids) return;
+      world.append(sv("circle", { class: "ring", r: d * R }));
+      world.append(sv("text", { class: "ring-label", x: 6, y: -d * R - 6, text: `${d === 4 ? "4+" : d} hop${d === 1 ? "" : "s"} · ${ids.length}` }));
+      ids.sort((a, b) => (fileOf(a) || "").localeCompare(fileOf(b) || "") || a.localeCompare(b));
+      ids.forEach((id, i) => { const a = (i / ids.length) * Math.PI * 2 - Math.PI / 2 + d * 0.4; pos.set(id, { x: Math.cos(a) * d * R, y: Math.sin(a) * d * R }); });
+    });
+    const ge = sv("g"), gn = sv("g");
+    world.append(ge, gn);
+    const paths = [];
+    for (const [id, p] of parent) { const a = pos.get(id), b = pos.get(p); if (a && b) { const e = sv("path", { class: "edge hot " + (symbolLevel ? "calls" : "imports"), d: curve(a, b, 0.1), "marker-end": "url(#arrowHot)" }); ge.append(e); paths.push(e); } }
+    for (const [id, p] of pos) {
+      const n = nodeOf(id), isFocus = id === focus;
+      const g = sv("g", { class: "node" + (isFocus ? " selected" : ""), transform: `translate(${p.x},${p.y})` });
+      const color = colorOf(fileOf(id));
+      g.append(sv("circle", { class: "halo", r: isFocus ? 26 : 13, fill: color, filter: "url(#glow)" }));
+      g.append(sv("circle", { class: "core", r: isFocus ? 16 : 7, fill: color }));
+      g.append(sv("text", { x: isFocus ? 22 : 11, y: 4, text: n.name }));
+      g.addEventListener("click", () => { if (!drag?.moved) select(id); });
+      gn.append(g);
+    }
+    if (!reduced) for (let i = 0; i < 3; i++) { const c = sv("circle", { class: "ripple", r: 10 }); world.append(c); setTimeout(() => c.classList.add("go"), 30 + i * 420); }
+    pulses(paths);
+    const total = dist.size - 1, pool = symbolLevel ? D.symbols.length : D.files.length;
+    $("#hint").textContent = total ? `Changing ${nodeOf(focus).name} can reach ${total} ${symbolLevel ? "symbol" : "file"}${total === 1 ? "" : "s"} (${Math.round((100 * total) / Math.max(1, pool - 1))}% of the ${symbolLevel ? "symbols" : "workspace"})` : `Nothing in the workspace depends on ${nodeOf(focus).name}`;
+    legend([["imports", "var(--saffron)", symbolLevel ? "called by" : "imported or called by"], ["", "", "ring = hops from the change"]]);
+  }
+
+  // ------------------------------------------------------------------ calls: symbol ego network around a file
+  function drawCalls() {
+    resetStage();
+    const fid = (state.sel && fileOf(state.sel)) || D.insights.most_depended[0] || D.files[0].id;
+    const own = [...(files.get(fid)?.symbols || [])].sort((a, b) => (syms.get(a).line - syms.get(b).line) || a.localeCompare(b));
+    if (!own.length) return emptyStage("No classes or functions here", `${files.get(fid).path} has no top-level symbols to connect.`);
+    const ownSet = new Set(own), callers = new Set(), callees = new Set(), edges = [];
+    for (const s of own) {
+      for (const t of [...get(callOut, s), ...get(inhOut, s)]) { edges.push([s, t, get(inhOut, s).includes(t) ? "inherits" : "calls"]); if (!ownSet.has(t)) callees.add(t); }
+      for (const c of [...get(callIn, s), ...get(inhIn, s)]) { if (!ownSet.has(c)) { callers.add(c); edges.push([c, s, get(inhIn, s).includes(c) ? "inherits" : "calls"]); } }
+    }
+    const COL = 330, ROW = 34, pos = new Map();
+    const column = (ids, x) => [...ids].sort().forEach((id, i, arr) => pos.set(id, { x, y: (i - (arr.length - 1) / 2) * ROW }));
+    column(callers, -COL); column(own, 0); column(callees, COL);
+    world.append(sv("text", { class: "lane-label", x: -COL, y: -(Math.max(callers.size, own.length, callees.size) / 2) * ROW - 24, "text-anchor": "middle", text: `callers · ${callers.size}` }));
+    world.append(sv("text", { class: "lane-label", x: 0, y: -(Math.max(callers.size, own.length, callees.size) / 2) * ROW - 24, "text-anchor": "middle", text: files.get(fid).name }));
+    world.append(sv("text", { class: "lane-label", x: COL, y: -(Math.max(callers.size, own.length, callees.size) / 2) * ROW - 24, "text-anchor": "middle", text: `calls out · ${callees.size}` }));
+    const ge = sv("g"), gn = sv("g");
+    world.append(ge, gn);
+    const edgeEls = [];
+    for (const [s, t, k] of edges) {
+      if (!state.filters[k]) continue;
+      const a = pos.get(s), b = pos.get(t);
+      if (!a || !b) continue;
+      const d = a.x === b.x ? `M${a.x + 70},${a.y} C${a.x + 140},${a.y} ${b.x + 140},${b.y} ${b.x + 70},${b.y}` : curve(a, b, 0.06);
+      const p = sv("path", { class: "edge " + k, d, "marker-end": "url(#arrow)" });
+      p.dataset.s = s; p.dataset.t = t; ge.append(p); edgeEls.push(p);
+    }
+    const nodeEls = new Map();
+    for (const [id, p] of pos) {
+      const s = syms.get(id), mine = ownSet.has(id);
+      const g = sv("g", { class: "node box" + (state.sel === id ? " selected" : ""), transform: `translate(${p.x - 70},${p.y - 13})` });
+      g.append(sv("rect", { width: 140, height: 26, rx: 8, fill: mine ? "var(--raise)" : "var(--panel-solid)", stroke: colorOf(s.file), "stroke-width": mine ? 1.8 : 1 }));
+      g.append(sv("text", { x: 10, y: 17, text: (s.kind === "class" ? "◆ " : "ƒ ") + (s.name.length > 18 ? s.name.slice(0, 17) + "…" : s.name) }));
+      g.addEventListener("mouseenter", () => hot(id)); g.addEventListener("mouseleave", () => hot(null));
+      g.addEventListener("click", () => { if (!drag?.moved) select(id); });
+      gn.append(g); nodeEls.set(id, g);
+    }
+    function hot(id) {
+      svg.classList.toggle("dim", !!id);
+      nodeEls.forEach((g) => g.classList.remove("hot")); edgeEls.forEach((p) => p.classList.remove("hot"));
+      if (!id) { pulses([]); return; }
+      nodeEls.get(id)?.classList.add("hot");
+      const hotE = edgeEls.filter((p) => p.dataset.s === id || p.dataset.t === id);
+      hotE.forEach((p) => { p.classList.add("hot"); nodeEls.get(p.dataset.s)?.classList.add("hot"); nodeEls.get(p.dataset.t)?.classList.add("hot"); });
+      pulses(hotE);
+    }
+    $("#hint").textContent = `${own.length} symbols in ${files.get(fid).path} · ${callers.size} callers · ${callees.size} callees (inferred)`;
+    legend([["calls", "rgba(61,214,198,.8)", "calls (inferred)"], ["inherits", "var(--rose)", "inherits"]]);
+  }
+
+  // ------------------------------------------------------------------ hotspots: squarified treemap
+  function drawHotspots() {
+    const box = $("#treemap");
+    box.replaceChildren();
+    const W = box.clientWidth || 800, H = box.clientHeight || 500;
+    const items = D.files.filter((f) => f.loc > 0).map((f) => ({ f, v: f.loc })).sort((a, b) => b.v - a.v);
+    if (!items.length) { box.append(el("div", { class: "empty" }, el("span", { class: "big", text: "🜂" }), "No lines to measure.")); return; }
+    const maxIn = Math.max(1, ...D.files.map((f) => f.fan_in));
+    const heat = (n) => { const t = n / maxIn; return t > 0.66 ? "var(--ember)" : t > 0.33 ? "var(--saffron)" : t > 0 ? "#ffd36e" : "var(--teal)"; };
+    const total = items.reduce((s, i) => s + i.v, 0);
+    let rect = { x: 0, y: 0, w: W, h: H }, row = [], rest = items.map((i) => ({ ...i, a: (i.v / total) * W * H }));
+    const worst = (r, side) => { const s = r.reduce((t, i) => t + i.a, 0), mx = Math.max(...r.map((i) => i.a)), mn = Math.min(...r.map((i) => i.a)); return Math.max((side * side * mx) / (s * s), (s * s) / (side * side * mn)); };
+    const flush = () => {
+      const s = row.reduce((t, i) => t + i.a, 0), horiz = rect.w >= rect.h, side = horiz ? rect.h : rect.w, thick = s / side;
+      let off = 0;
+      for (const i of row) {
+        const len = i.a / thick;
+        const cell = horiz ? { x: rect.x, y: rect.y + off, w: thick, h: len } : { x: rect.x + off, y: rect.y, w: len, h: thick };
+        off += len;
+        const d = el("button", { class: "tm-cell" + (fileOf(state.sel || "") === i.f.id ? " selected" : ""), title: `${i.f.path} · ${i.f.loc} lines · imported by ${i.f.fan_in}`, style: `left:${cell.x}px;top:${cell.y}px;width:${Math.max(0, cell.w - 2)}px;height:${Math.max(0, cell.h - 2)}px;background:${heat(i.f.fan_in)}`, onclick: () => select(i.f.id) });
+        if (cell.w > 60 && cell.h > 26) d.append(el("b", { text: i.f.name }), el("small", { text: `${fmt(i.f.loc)} lines · ←${i.f.fan_in}` }));
+        box.append(d);
+      }
+      if (horiz) { rect = { x: rect.x + thick, y: rect.y, w: rect.w - thick, h: rect.h }; } else { rect = { x: rect.x, y: rect.y + thick, w: rect.w, h: rect.h - thick }; }
+      row = [];
+    };
+    while (rest.length) {
+      const side = Math.min(rect.w, rect.h), next = rest[0];
+      if (!row.length || worst([...row, next], side) <= worst(row, side)) { row.push(next); rest.shift(); } else flush();
+    }
+    if (row.length) flush();
+    $("#hint").textContent = "";
+    legend([["", "var(--teal)", "imported by none"], ["", "#ffd36e", "a few"], ["", "var(--saffron)", "many"], ["", "var(--ember)", "most"], ["", "", "area = lines"]]);
+  }
+
+  // ------------------------------------------------------------------ guided tour
+  function tourSteps() {
+    const P = D.project, steps = [{ title: "Overview", text: `${P.name}: ${fmt(P.files)} files in ${fmt(P.packages)} packages, ${fmt(P.symbols)} classes and functions, ${fmt(P.loc)} lines.`, view: "constellation" }];
+    [...D.packages].sort((a, b) => b.files.length - a.files.length).slice(0, 3).forEach((p) => steps.push({ title: "Package", text: `${p.id === "." ? "The root" : p.id} holds ${p.files.length} file${p.files.length === 1 ? "" : "s"}.`, view: "constellation", pkg: p.id }));
+    D.insights.entry_points.slice(0, 2).forEach((id) => steps.push({ title: "Entry point", text: `${files.get(id).path} looks like a way in: start reading here.`, view: "constellation", sel: id }));
+    const top = D.insights.most_depended[0];
+    if (top) steps.push({ title: "Most depended on", text: `${files.get(top).path} is imported by ${files.get(top).fan_in} files. A change here ripples furthest.`, view: "impact", sel: top });
+    const big = D.insights.largest[0];
+    if (big) steps.push({ title: "Largest file", text: `${files.get(big).path} has ${fmt(files.get(big).loc)} lines and ${files.get(big).symbols.length} symbols.`, view: "hotspots", sel: big });
+    if (D.insights.cycles.length) steps.push({ title: "Import cycles", text: `${D.insights.cycles.length} cycle${D.insights.cycles.length === 1 ? "" : "s"}, e.g. ${D.insights.cycles[0].map((id) => files.get(id).name).join(" ↔ ")}. Cycles make modules hard to change alone.`, view: "flow", sel: D.insights.cycles[0][0] });
+    if (D.external.length) steps.push({ title: "Outside world", text: `Depends on ${D.external.length} external modules, most used: ${[...D.external].sort((a, b) => b.importers.length - a.importers.length).slice(0, 5).map((e) => e.name).join(", ")}.`, view: "constellation" });
+    steps.push({ title: "What this map can't see", text: D.limitations[1] || D.limitations[0], view: "constellation" });
+    return steps;
+  }
+  let tourTimer = null, typeTimer = null;
+  function runTour(i) {
+    const steps = tourSteps();
+    state.tour = (i + steps.length) % steps.length;
+    const s = steps[state.tour];
+    $("#narration").hidden = false;
+    $("#tourStep").textContent = `${state.tour + 1} / ${steps.length} · ${s.title}`;
+    $("#tourDots").replaceChildren(...steps.map((_, k) => el("i", { class: k <= state.tour ? "on" : "" })));
+    state.sel = s.sel || null;
+    renderView(s.view, true);
+    if (s.pkg && constellation) { const c = constellation.centers.find((c) => c.id === s.pkg); if (c) fit(30, { x: c.x - c.r, y: c.y - c.r, width: c.r * 2, height: c.r * 2 }); }
+    const t = $("#tourText"); clearInterval(typeTimer);
+    if (reduced) t.textContent = s.text; else { let k = 0; t.textContent = ""; typeTimer = setInterval(() => { t.textContent = s.text.slice(0, ++k); if (k >= s.text.length) clearInterval(typeTimer); }, 16); }
+    clearTimeout(tourTimer);
+    if (state.playing) tourTimer = setTimeout(() => runTour(state.tour + 1), 6500);
+  }
+  $("#tourPrev").onclick = () => runTour(state.tour - 1);
+  $("#tourNext").onclick = () => runTour(state.tour + 1);
+  $("#tourPlay").onclick = () => { state.playing = !state.playing; $("#tourPlay").textContent = state.playing ? "❚❚ Pause" : "▶ Play"; runTour(state.tour); };
+
+  // ------------------------------------------------------------------ view switching
+  const VIEWS = {
+    constellation: { icon: "✦", label: "Constellation", desc: "Every file, clustered by package. Hover to light up what it imports and what imports it.", draw: drawConstellation },
+    flow: { icon: "⇶", label: "Flow", desc: "Dependencies left to right, from entry side to foundations. Cycles glow rose.", draw: drawFlow },
+    impact: { icon: "◎", label: "Impact", desc: "Blast radius: what could break if the selected file or symbol changes.", draw: drawImpact },
+    calls: { icon: "ƒ", label: "Calls", desc: "Who calls into the selected file, and what it calls (inferred from imports).", draw: drawCalls },
+    hotspots: { icon: "▦", label: "Hotspots", desc: "Big files that many others depend on are where changes cost the most.", draw: drawHotspots },
+    tour: { icon: "☄", label: "Tour", desc: "A guided walk through this codebase.", draw: () => runTour(state.tour) },
+  };
+  const tabs = $("#tabs");
+  for (const [id, v] of Object.entries(VIEWS)) tabs.append(el("button", { class: "tab", role: "tab", "data-view": id, "aria-selected": "false", onclick: () => { if (id !== "tour") { clearTimeout(tourTimer); $("#narration").hidden = true; } renderView(id); } }, el("span", { class: "ic", "aria-hidden": "true", text: v.icon }), v.label));
+  function renderView(id, fromTour) {
+    if (!VIEWS[id]) id = "constellation";
+    if (!fromTour) state.view = id;
+    if (id === "tour") { state.view = "tour"; markTabs("tour"); return VIEWS.tour.draw(); }
+    markTabs(fromTour ? "tour" : id);
+    $("#viewTitle").textContent = VIEWS[id].label;
+    $("#viewDesc").textContent = VIEWS[id].desc;
+    const tm = id === "hotspots";
+    $("#treemap").hidden = !tm; svg.style.display = tm ? "none" : "block"; $("#zoomTools").hidden = tm;
+    toolsFor(id);
+    $("#hint").textContent = "";
+    VIEWS[id].draw();
+    if (!tm) fit();
+    inspect(state.sel);
+    syncHash();
+  }
+  function markTabs(id) { tabs.querySelectorAll(".tab").forEach((t) => t.setAttribute("aria-selected", String(t.dataset.view === id))); }
+  function toolsFor(id) {
+    const box = $("#stageTools"); box.replaceChildren();
+    const keys = id === "constellation" || id === "flow" ? ["imports"] : id === "calls" ? ["calls", "inherits"] : [];
+    for (const k of keys) box.append(el("button", { class: "chip", "aria-pressed": String(state.filters[k]), text: k, onclick: () => { state.filters[k] = !state.filters[k]; renderView(state.view === "tour" ? "constellation" : state.view); } }));
+    if (id === "flow") for (const lvl of ["packages", "files"]) box.append(el("button", { class: "chip", "aria-pressed": String((state.flowLevel || (D.files.length > 120 ? "packages" : "files")) === lvl), text: lvl, onclick: () => { state.flowLevel = lvl; renderView("flow"); } }));
+    if (id === "impact" || id === "calls") box.append(el("span", { class: "muted", text: state.sel ? "" : "Select a file or symbol to focus" }));
+  }
+  function legend(items) {
+    const L = $("#legend"); L.replaceChildren();
+    for (const [, color, label] of items) if (label) L.append(el("span", {}, color ? el("i", { style: `background:${color}` }) : "", label));
+    L.hidden = !L.childElementCount;
+  }
+  function emptyStage(title, text) {
+    world.append(sv("text", { x: 0, y: 0, "text-anchor": "middle", class: "pkg-label", text: title }));
+    world.append(sv("text", { x: 0, y: 22, "text-anchor": "middle", class: "ring-label", text }));
+    legend([]);
+  }
+
+  // ------------------------------------------------------------------ selection and inspector
+  function select(id) {
+    state.sel = id && nodeOf(id) ? id : null;
+    if (state.view !== "tour") renderView(state.view); else inspect(state.sel);
+    document.querySelectorAll(".tree-item").forEach((t) => t.setAttribute("aria-current", String(t.dataset.id === (state.sel && fileOf(state.sel)))));
+    if (window.innerWidth <= 1180 && state.sel) $("#inspector").classList.add("open");
+    syncHash();
+  }
+  const link = (id, where) => { const n = nodeOf(id); return n ? el("button", { class: "link", onclick: () => select(id) }, el("span", { class: "dot", style: `color:${colorOf(fileOf(id))}` }), el("span", { class: "kind " + (n.kind || "file"), text: n.kind || "file" }), el("span", { text: n.name }), where ? el("span", { class: "where", text: where }) : "") : null; };
+  const section = (title, kids) => (kids.filter(Boolean).length ? [el("h3", { class: "eyebrow", text: title }), el("div", { class: "links" }, kids)] : []);
+  function inspect(id) {
+    const body = $("#inspectBody"); body.replaceChildren();
+    const close = el("button", { class: "btn icon", "aria-label": "Close inspector", text: "✕", onclick: () => $("#inspector").classList.remove("open"), style: "margin-left:auto" });
+    if (!id) {
+      const P = D.project;
+      body.append(
+        el("div", { class: "ins-head" }, el("h2", { text: P.name }), close),
+        el("p", { class: "muted", text: "Pick anything in the graph, the tree or search to see its source, contract and connections." }),
+        el("div", { class: "facts" }, ...[["files", P.files], ["symbols", P.symbols], ["lines", P.loc], ["imports", P.imports], ["calls", P.calls], ["external", P.external]].map(([k, v]) => el("div", { class: "fact" }, el("b", { text: fmt(v) }), el("span", { text: k })))),
+        ...section("Most depended on", D.insights.most_depended.slice(0, 6).map((f) => link(f, `← ${files.get(f).fan_in}`))),
+        ...section("Entry points", D.insights.entry_points.slice(0, 6).map((f) => link(f))),
+        el("h3", { class: "eyebrow", text: "How to read this" }),
+        el("ul", { class: "muted" }, el("li", { text: "Circles are files; size is lines of code, colour is the package." }), el("li", { text: "Arrows point from a file to what it imports." }), el("li", { text: "Calls and inheritance are inferred statically by Ananke and may miss dynamic dispatch." })),
+      );
+      return;
+    }
+    const f = files.get(id);
+    if (f) {
+      body.append(
+        el("div", { class: "ins-head" }, el("span", { class: "kind file", text: "file" }), el("div", {}, el("h2", { text: f.name }), el("div", { class: "ins-path mono", text: f.path })), close),
+        f.doc ? el("div", { class: "ins-doc", text: f.doc }) : "",
+        el("div", { class: "facts" }, el("div", { class: "fact" }, el("b", { text: fmt(f.loc) }), el("span", { text: "lines" })), el("div", { class: "fact" }, el("b", { text: f.fan_in }), el("span", { text: "imported by" })), el("div", { class: "fact" }, el("b", { text: f.fan_out }), el("span", { text: "imports" }))),
+        el("div", { class: "actions" },
+          el("button", { class: "btn primary", text: "◎ Impact", onclick: () => renderView("impact") }),
+          el("button", { class: "btn", text: "ƒ Calls", onclick: () => renderView("calls") }),
+          el("button", { class: "btn", text: "⇶ Flow", onclick: () => renderView("flow") }),
+          el("button", { class: "btn", text: "⧉ Copy path", onclick: () => copy(f.path, "Path copied") })),
+        f.parse_error ? el("p", { class: "ins-doc", text: "Ananke couldn't parse this file, so its symbols aren't shown." }) : "",
+        cycleFiles.has(f.id) ? el("p", { class: "ins-doc", text: "Part of an import cycle (see Flow)." }) : "",
+        ...section(`Symbols · ${f.symbols.length}`, f.symbols.map((s) => link(s, `L${syms.get(s).line}`))),
+        ...section(`Imported by · ${f.fan_in}`, get(inn, f.id).sort().map((x) => link(x))),
+        ...section(`Imports · ${f.fan_out}`, get(out, f.id).sort().map((x) => link(x))),
+        f.external.length ? el("h3", { class: "eyebrow", text: "External modules" }) : "",
+        f.external.length ? el("div", { class: "tagline" }, ...f.external.map((m) => el("span", { class: "tag mono", text: m }))) : "",
+      );
+      return;
+    }
+    const s = syms.get(id);
+    const file = files.get(s.file);
+    const src = el("pre", { class: "src", "aria-label": "Source" });
+    (s.source || "").split("\n").forEach((line, i) => src.append(el("span", { "data-ln": s.line + i, text: line || " " })));
+    body.append(
+      el("div", { class: "ins-head" }, el("span", { class: "kind " + s.kind, text: s.kind }), el("div", {}, el("h2", { text: s.name }), el("div", { class: "ins-path mono", text: `${file ? file.path : ""}:${s.line}` })), close),
+      s.signature ? el("div", { class: "sig mono", text: s.signature }) : "",
+      s.doc ? el("div", { class: "ins-doc", text: s.doc }) : "",
+      el("div", { class: "facts" }, el("div", { class: "fact" }, el("b", { text: s.calls_in }), el("span", { text: "called by" })), el("div", { class: "fact" }, el("b", { text: s.calls_out }), el("span", { text: "calls" })), el("div", { class: "fact" }, el("b", { text: Math.max(1, s.end_line - s.line + 1) }), el("span", { text: "lines" }))),
+      el("div", { class: "actions" },
+        el("button", { class: "btn primary", text: "◎ Who's affected", onclick: () => renderView("impact") }),
+        el("button", { class: "btn", text: "ƒ Calls", onclick: () => renderView("calls") }),
+        file ? el("button", { class: "btn", text: "↑ File", onclick: () => select(file.id) }) : "",
+        el("button", { class: "btn", text: "⤓ Ask for deeper analysis", onclick: () => requestAnalysis(s.id) })),
+      s.source ? el("h3", { class: "eyebrow", text: "Source" }) : "",
+      s.source ? src : "",
+      ...section("Called by", get(callIn, s.id).sort().map((x) => link(x, files.get(fileOf(x))?.name))),
+      ...section("Calls", get(callOut, s.id).sort().map((x) => link(x, files.get(fileOf(x))?.name))),
+      ...section("Inherits from", get(inhOut, s.id).map((x) => link(x))),
+      ...section("Subclassed by", get(inhIn, s.id).map((x) => link(x))),
+    );
+  }
+
+  // ------------------------------------------------------------------ sidebar: insights, tree, search
+  function buildSidebar() {
+    $("#projectName").textContent = D.project.name;
+    const P = D.project;
+    $("#stats").replaceChildren(...[["files", P.files], ["packages", P.packages], ["symbols", P.symbols], ["lines", P.loc], ["imports", P.imports], ["calls", P.calls], ["external", P.external]].map(([k, v]) => el("div", { class: "stat" }, el("b", { text: fmt(v) }), el("span", { text: k }))),
+      D.insights.cycles.length ? el("div", { class: "stat warn" }, el("b", { text: D.insights.cycles.length }), el("span", { text: "import cycles" })) : "");
+    const ins = $("#insights"); ins.replaceChildren(el("h2", { class: "eyebrow", text: "Start here" }));
+    const card = (label, text, onclick) => ins.append(el("button", { class: "insight", onclick }, el("b", { text: label }), el("span", { text })));
+    card("Guided tour", "Walk through this codebase step by step", () => renderView("tour"));
+    if (D.insights.most_depended[0]) card("Most depended on", files.get(D.insights.most_depended[0]).path, () => { state.view = "impact"; select(D.insights.most_depended[0]); });
+    if (D.insights.cycles.length) card("Import cycles", `${D.insights.cycles.length} found`, () => { state.view = "flow"; select(D.insights.cycles[0][0]); });
+    if (D.insights.largest[0]) card("Largest file", files.get(D.insights.largest[0]).path, () => { state.view = "hotspots"; select(D.insights.largest[0]); });
+    const tree = $("#tree"); tree.replaceChildren();
+    for (const p of D.packages) {
+      const kids = el("div", { class: "tree-children", role: "group", hidden: D.packages.length > 6 ? true : false });
+      const head = el("button", { class: "tree-item tree-pkg", role: "treeitem", "aria-expanded": String(D.packages.length <= 6), onclick: () => { kids.hidden = !kids.hidden; head.setAttribute("aria-expanded", String(!kids.hidden)); } },
+        el("span", { class: "dot", style: `color:${PALETTE[pkgIndex.get(p.id) % PALETTE.length]}` }), el("span", { text: p.id === "." ? "(root)" : p.id }), el("span", { class: "count", text: p.files.length }));
+      for (const fid of p.files) kids.append(el("button", { class: "tree-item", role: "treeitem", "data-id": fid, onclick: () => select(fid) }, el("span", { text: files.get(fid).name }), el("span", { class: "count", text: fmt(files.get(fid).loc) })));
+      tree.append(head, kids);
+    }
+  }
+  const searchIndex = [...D.files.map((f) => ({ id: f.id, name: f.name, hay: f.path.toLowerCase(), kind: "file", where: f.package })), ...D.symbols.map((s) => ({ id: s.id, name: s.name, hay: s.name.toLowerCase(), kind: s.kind, where: files.get(s.file)?.name || "" }))];
+  function find(q, limit = 30) {
+    q = q.trim().toLowerCase();
+    if (!q) return [];
+    const scored = [];
+    for (const it of searchIndex) { const i = it.hay.indexOf(q); if (i < 0) continue; scored.push([(it.name.toLowerCase().startsWith(q) ? 0 : 1) * 1000 + i * 10 + it.name.length, it]); }
+    return scored.sort((a, b) => a[0] - b[0] || a[1].id.localeCompare(b[1].id)).slice(0, limit).map((x) => x[1]);
+  }
+  const search = $("#search"), results = $("#results");
+  let active = 0;
+  function showResults() {
+    const hits = find(search.value);
+    results.hidden = !search.value;
+    results.replaceChildren(...(hits.length ? hits.map((h, i) => el("button", { class: "result", role: "option", "aria-selected": String(i === active), onclick: () => { select(h.id); search.value = ""; showResults(); search.blur(); } }, el("span", { class: "kind " + h.kind, text: h.kind }), el("span", { text: h.name }), el("span", { class: "where", text: h.where }))) : [el("div", { class: "empty", text: "Nothing matches" })]));
+  }
+  search.addEventListener("input", () => { active = 0; showResults(); });
+  search.addEventListener("keydown", (e) => {
+    const opts = results.querySelectorAll(".result");
+    if (e.key === "ArrowDown") { active = Math.min(opts.length - 1, active + 1); showResults(); e.preventDefault(); }
+    else if (e.key === "ArrowUp") { active = Math.max(0, active - 1); showResults(); e.preventDefault(); }
+    else if (e.key === "Enter" && opts[active]) opts[active].click();
+    else if (e.key === "Escape") { search.value = ""; showResults(); search.blur(); }
+  });
+  $("#searchBtn").onclick = () => search.focus();
+
+  // ------------------------------------------------------------------ command palette
+  const palette = $("#palette"), pInput = $("#paletteInput"), pList = $("#paletteList");
+  const commands = () => [
+    ...Object.entries(VIEWS).map(([id, v]) => ({ label: `${v.icon}  Go to ${v.label}`, run: () => renderView(id) })),
+    { label: "◐  Toggle theme", run: toggleTheme },
+    { label: "⤢  Fit to screen", run: () => fit() },
+    { label: "⧉  Copy a link to this view", run: () => copy(location.href, "Link copied") },
+    { label: "⤓  Download this view's state (JSON)", run: downloadState },
+    { label: "⤓  Ask for deeper analysis of the selection", run: () => requestAnalysis(state.sel) },
+    { label: "ⓘ  About this report and its limitations", run: about },
+  ];
+  let pActive = 0;
+  function renderPalette() {
+    const q = pInput.value.toLowerCase();
+    const cmds = commands().filter((c) => c.label.toLowerCase().includes(q));
+    const hits = find(pInput.value, 12).map((h) => ({ label: `${h.kind === "file" ? "▤" : "ƒ"}  ${h.name}  ·  ${h.where}`, run: () => select(h.id) }));
+    const all = [...cmds, ...hits];
+    pActive = Math.min(pActive, Math.max(0, all.length - 1));
+    pList.replaceChildren(...all.map((c, i) => el("button", { class: "pl-item", role: "option", "aria-selected": String(i === pActive), onclick: () => { closePalette(); c.run(); } }, c.label)));
+  }
+  const openPalette = () => { palette.hidden = false; pInput.value = ""; pActive = 0; renderPalette(); pInput.focus(); };
+  const closePalette = () => { palette.hidden = true; };
+  pInput.addEventListener("input", () => { pActive = 0; renderPalette(); });
+  pInput.addEventListener("keydown", (e) => {
+    const n = pList.children.length;
+    if (e.key === "ArrowDown") { pActive = (pActive + 1) % Math.max(1, n); renderPalette(); e.preventDefault(); }
+    else if (e.key === "ArrowUp") { pActive = (pActive - 1 + n) % Math.max(1, n); renderPalette(); e.preventDefault(); }
+    else if (e.key === "Enter") pList.children[pActive]?.click();
+    else if (e.key === "Escape") closePalette();
+  });
+  palette.addEventListener("click", (e) => { if (e.target === palette) closePalette(); });
+  $("#paletteBtn").onclick = openPalette;
+
+  // ------------------------------------------------------------------ about, theme, exports, toast
+  function about() {
+    const b = $("#aboutBody");
+    const pre = el("pre", { class: "manifest mono", text: JSON.stringify(M, null, 2) });
+    b.replaceChildren(
+      el("h2", { id: "aboutTitle", text: "About this report" }),
+      el("p", { text: "Generated by Dev Guru from the code graph Ananke Plexus built for this workspace. It works offline and is view-only: it never runs commands or contacts a server." }),
+      el("h3", { class: "eyebrow", text: "Limitations" }),
+      el("ul", {}, ...D.limitations.map((l) => el("li", { text: l }))),
+      el("h3", { class: "eyebrow", text: "Keyboard" }),
+      el("ul", {}, el("li", { text: "/  search · Ctrl/⌘ K  commands · 1–6  views · F  fit · T  theme · Esc  close" })),
+      el("h3", { class: "eyebrow", text: "Manifest" }), pre,
+      el("p", {}, el("button", { class: "btn", text: "Close", onclick: () => ($("#about").hidden = true) })),
+    );
+    $("#about").hidden = false;
+  }
+  $("#about").addEventListener("click", (e) => { if (e.target.id === "about") $("#about").hidden = true; });
+  $("#infoBtn").onclick = about;
+  function toggleTheme() { const r = document.documentElement; r.dataset.theme = r.dataset.theme === "day" ? "night" : "day"; syncHash(); }
+  $("#themeBtn").onclick = toggleTheme;
+  function download(name, obj) {
+    const a = el("a", { download: name, href: URL.createObjectURL(new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" })) });
+    document.body.append(a); a.click(); a.remove();
+    toast(`Saved ${name}`);
+  }
+  const downloadState = () => download("dev-guru-view.json", { schema: "dev-guru/view-state@1", report: M.input_digest, view: state.view, selection: state.sel, filters: state.filters });
+  function requestAnalysis(id) {
+    download("dev-guru-analysis-request.json", {
+      schema: "dev-guru/analysis-request@1",
+      note: "Run this with Dev Guru or Ananke; the report itself never executes anything.",
+      workspace: M.workspace, report_digest: M.input_digest, target: id || null,
+      requested: id ? ["impact", "callers", "tests-covering"] : ["full-explore"],
+      suggested_command: `dev explore ${id ? "--focus " + JSON.stringify(id) : ""}`.trim(),
+    });
+  }
+  async function copy(text, done) {
+    try { await navigator.clipboard.writeText(text); toast(done); }
+    catch (_) { window.prompt("Copy:", text); }
+  }
+  let toastTimer;
+  function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 1800); }
+
+  // ------------------------------------------------------------------ footer and keyboard
+  const rev = M.workspace && M.workspace.commit ? `${M.workspace.commit.slice(0, 8)}${M.workspace.dirty ? " (uncommitted changes)" : ""}` : "not a git checkout";
+  $("#foot").replaceChildren(
+    el("span", {}, el("b", { text: "Dev Guru " }), String(M.dev_guru)), el("span", {}, el("b", { text: "Ananke " }), String(M.ananke)),
+    el("span", {}, el("b", { text: "revision " }), rev), el("span", {}, el("b", { text: "input " }), String(M.input_digest).slice(0, 19) + "…"),
+    el("span", {}, el("b", { text: "generated " }), String(M.generated_at)), el("span", { text: "offline · view-only" }),
+  );
+  document.addEventListener("keydown", (e) => {
+    const typing = /INPUT|TEXTAREA/.test(document.activeElement?.tagName || "");
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); palette.hidden ? openPalette() : closePalette(); return; }
+    if (e.key === "Escape") { closePalette(); $("#about").hidden = true; $("#inspector").classList.remove("open"); return; }
+    if (typing) return;
+    if (e.key === "/") { e.preventDefault(); search.focus(); }
+    else if (e.key >= "1" && e.key <= "6") renderView(Object.keys(VIEWS)[+e.key - 1]);
+    else if (e.key.toLowerCase() === "f") fit();
+    else if (e.key.toLowerCase() === "t") toggleTheme();
+    else if (state.view === "tour" && e.key === "ArrowRight") runTour(state.tour + 1);
+    else if (state.view === "tour" && e.key === "ArrowLeft") runTour(state.tour - 1);
+  });
+  let resizeTimer;
+  window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (state.view === "hotspots") drawHotspots(); else fit(); }, 150); });
+
+  buildSidebar();
+  renderView(state.view);
+  if (state.sel) select(state.sel);
+  window.__devGuru = { state, D, M, renderView, select, find };
+})();

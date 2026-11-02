@@ -8,20 +8,42 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
 
 ## [Unreleased]
 
+---
+
+## [0.1.0] — 2026-11-02
+
+The first release.
+
 ### Added
 
-- **Scaffold** (`DG-PACKAGE`). A Python package (`dev-guru`, module `dev_guru` and command `devguru`, all
-  provisional) with the same tooling as Ananke Plexus and Dex Trove:
-  - uv + hatchling, ruff, strict mypy and pytest;
-  - a capability acceptance suite with release gate (byte-identical harness);
+- **`dev explore`**: Ananke builds the code graph, and Dev Guru writes one interactive, offline HTML explorer plus a
+  manifest.
+  - Six views: constellation, flow (package or file level), impact rings, calls, hotspots and a narrated tour.
+  - Around them: search, a command palette, a source inspector, a light and dark theme, and URL-shareable state.
+  - Explicit downloads of the view state and of analysis requests.
+- **Report safety.**
+  - Everything is inlined, and the page sets a CSP with `connect-src 'none'`.
+  - JSON is embedded with `<`, `>`, `&` and U+2028/U+2029 escaped; untrusted text is set only with
+    `textContent`.
+  - Templates are filled in a single pass, so source code containing the template's placeholders stays data.
+  - A manifest records the renderer, the Dev Guru and Ananke versions, the input digest and the git revision.
+- **View model `dev-guru/explorer@1`**: packages, files, symbols with source snippets, resolved import, call and
+  inheritance edges, insights (most depended-on, largest, entry points, import cycles) and stated limitations.
+  Deterministic.
+- **SDK** `GuruClient(workspace).explore()` / `.export()`, sharing one service layer with the CLI.
+- **`dev doctor`**: version and capability negotiation with Ananke (`ananke-plexus>=0.3.12,<0.4`) over one explicit
+  transport, with stable error codes.
+- **Docs site** with a live demo (Dev Guru exploring its own source) and the "Lantern" theme.
+- **Release gates:**
+  - acceptance on the built wheel, including real-Chrome report journeys and a dogfood run on Dev Guru's own source;
   - a distribution scan (gitleaks, pip-audit, GuardDog, Bandit);
-  - CI, security and workflow-lint pipelines with pinned actions.
-- **Ananke client port** (`dev_guru.client`).
-  - `connect(transport)` returns one explicit transport (`in-process`, over the installed `ananke-plexus`).
-  - Negotiation checks the supported range (`>=0.3.11,<0.4`) and probes the capabilities Dev Guru calls.
-  - `graph_summary(workspace)` summarises the graph Ananke builds.
-  - Errors carry stable codes.
-- **`devguru doctor [--json]`**: the harness version, the support verdict, capabilities, and whether Dex is present
-  (optional).
+  - Trivy and build provenance.
 
-Not released: no package has been published.
+### Changed
+
+- The command is **`dev`** (it was `devguru` in the unreleased scaffold).
+
+### Fixed
+
+- Import cycles in Dev Guru itself, found by exploring it: `dev_guru` now exposes `GuruClient` lazily, and
+  `client.inprocess` imports `negotiation` directly.

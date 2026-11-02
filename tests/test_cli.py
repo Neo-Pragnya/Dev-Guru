@@ -36,3 +36,17 @@ def test_doctor_unknown_transport_is_a_clean_error() -> None:
     result = runner.invoke(app, ["doctor", "--transport", "gateway", "--json"])
     assert result.exit_code == 2
     assert json.loads(result.output)["error"]["code"] == "UNSUPPORTED_TRANSPORT"
+
+
+def test_explore_writes_a_report_and_manifest(project, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    out = tmp_path / "r.html"
+    result = runner.invoke(app, ["explore", str(project), "-o", str(out), "--json"])
+    assert result.exit_code == 0, result.output
+    summary = json.loads(result.output)
+    assert summary["project"]["files"] == 3 and summary["input_digest"].startswith("sha256:")
+    assert out.is_file() and out.with_name("r.html.manifest.json").is_file()
+
+
+def test_explore_on_an_empty_directory_fails_cleanly(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    result = runner.invoke(app, ["explore", str(tmp_path), "-o", str(tmp_path / "r.html")])
+    assert result.exit_code == 1 and "WORKSPACE_INVALID" in result.output

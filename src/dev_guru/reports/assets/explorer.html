@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en" data-theme="night">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="Dev Guru explorer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<title>{{TITLE}}</title>
+<style>{{CSS}}</style>
+</head>
+<body>
+<a class="skip" href="#inspector">Skip to inspector</a>
+<div class="app" id="app">
+  <header class="top">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><defs><radialGradient id="flame" cx="50%" cy="60%" r="60%"><stop offset="0" stop-color="#fff3c4"/><stop offset=".45" stop-color="#ffb347"/><stop offset="1" stop-color="#ff6b3d"/></radialGradient></defs><path d="M16 3c3 5 8 8 8 15a8 8 0 0 1-16 0c0-4 2-6 3-8 1 3 2 4 4 4-1-4 0-8 1-11z" fill="url(#flame)"/><path d="M6 25h20l-2 4H8z" fill="currentColor" opacity=".7"/></svg>
+      <div class="brand-text"><strong>Dev Guru</strong><span id="projectName">explorer</span></div>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Views" id="tabs"></nav>
+    <div class="top-actions">
+      <button class="btn ghost" id="searchBtn" title="Search (/)"><span aria-hidden="true">⌕</span><span class="hide-sm"> Search</span><kbd class="hide-sm">/</kbd></button>
+      <button class="btn ghost" id="paletteBtn" title="Command palette (Ctrl/⌘ K)"><span aria-hidden="true">⌘</span><span class="hide-sm"> Commands</span></button>
+      <button class="btn ghost icon" id="themeBtn" aria-label="Toggle light and dark theme" title="Theme">◐</button>
+      <button class="btn ghost icon" id="infoBtn" aria-label="About this report and its limitations" title="About">ⓘ</button>
+    </div>
+  </header>
+  <div class="stats" id="stats" aria-label="Project summary"></div>
+  <div class="workspace">
+    <aside class="sidebar" id="sidebar" aria-label="Repository">
+      <label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Find files, classes, functions…" autocomplete="off" aria-label="Find files and symbols"></label>
+      <div id="results" class="results" role="listbox" aria-label="Search results" hidden></div>
+      <section class="insights" id="insights" aria-label="Insights"></section>
+      <h2 class="eyebrow">Packages</h2>
+      <div id="tree" class="tree" role="tree" aria-label="Packages and files"></div>
+    </aside>
+    <main class="stage-wrap" id="main">
+      <div class="stage-head">
+        <div><h1 id="viewTitle">Constellation</h1><p id="viewDesc" class="muted"></p></div>
+        <div class="stage-tools" id="stageTools"></div>
+      </div>
+      <div class="stage" id="stage" tabindex="0" aria-label="Interactive graph. Use the sidebar for keyboard navigation.">
+        <svg id="svg" class="canvas" role="img" aria-labelledby="viewTitle"></svg>
+        <div id="treemap" class="treemap" hidden></div>
+        <div class="zoom" id="zoomTools">
+          <button class="btn icon" id="zoomIn" aria-label="Zoom in">+</button>
+          <button class="btn icon" id="zoomOut" aria-label="Zoom out">−</button>
+          <button class="btn icon" id="fitBtn" aria-label="Fit to screen">⤢</button>
+        </div>
+        <div class="legend" id="legend" aria-hidden="true"></div>
+        <div class="hint" id="hint"></div>
+      </div>
+      <div class="narration" id="narration" aria-live="polite" hidden>
+        <div class="narration-text"><span class="step" id="tourStep"></span><p id="tourText"></p></div>
+        <div class="narration-ctl">
+          <button class="btn icon" id="tourPrev" aria-label="Previous step">‹</button>
+          <button class="btn" id="tourPlay">❚❚ Pause</button>
+          <button class="btn icon" id="tourNext" aria-label="Next step">›</button>
+        </div>
+        <div class="dots" id="tourDots" aria-hidden="true"></div>
+      </div>
+    </main>
+    <aside class="inspector" id="inspector" aria-label="Inspector" tabindex="-1"><div id="inspectBody"></div></aside>
+  </div>
+  <footer class="foot" id="foot"></footer>
+</div>
+<div class="palette" id="palette" role="dialog" aria-modal="true" aria-label="Command palette" hidden>
+  <div class="palette-box"><input id="paletteInput" placeholder="Jump to a file or symbol, or type a command…" aria-label="Command"><div id="paletteList" class="palette-list" role="listbox"></div></div>
+</div>
+<div class="modal" id="about" role="dialog" aria-modal="true" aria-labelledby="aboutTitle" hidden><div class="modal-box" id="aboutBody"></div></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script type="application/json" id="dg-data">{{DATA}}</script>
+<script type="application/json" id="dg-manifest">{{MANIFEST}}</script>
+<script>{{JS}}</script>
+</body>
+</html>

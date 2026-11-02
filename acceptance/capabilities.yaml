@@ -3,7 +3,7 @@
 # blocker: true → a failing or unproven capability BLOCKs the release; the rest hold it at CONDITIONAL.
 product: Dev Guru
 default_fixture: shop
-binaries: [devguru]
+binaries: [dev]
 surface_target: 0.9
 
 capabilities:
@@ -11,9 +11,13 @@ capabilities:
   - { id: harness, title: "Negotiates the Ananke harness: version range, required capabilities, one explicit transport", dimension: core, blocker: true }
   - { id: harness-graph, title: "The SDK reaches real Ananke analysis (graph of a fixture project), not a mock", dimension: core, blocker: true }
   - { id: dex-optional, title: "Works without Dex Trove; the core never imports it", dimension: architecture, blocker: true }
+  - { id: explore, title: "dev explore: real Ananke graph → explorer view model → one offline HTML report + manifest", dimension: core, blocker: true }
+  - { id: report-safety, title: "Reports are offline, view-only and treat source as text (hostile input stays inert)", dimension: safety, blocker: true }
+  - { id: report-browser, title: "In real Chrome every view renders; search, palette, tour and theme work; fits a phone", dimension: experience, blocker: true }
   - { id: cli-ux, title: "Errors are clean, carry stable codes, and refusals exit non-zero", dimension: usability, blocker: false }
 
 # Every user-facing command.
 surface:
-  - devguru
-  - devguru doctor
+  - dev
+  - dev doctor
+  - dev explore

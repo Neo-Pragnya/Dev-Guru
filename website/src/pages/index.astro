@@ -1,0 +1,158 @@
+---
+import { getCollection } from "astro:content";
+import Glyph from "../components/Glyph.astro";
+import Layout from "../components/Layout.astro";
+import { DOC_NAV, DOC_TITLES, STATS, docHref, site } from "../lib/site";
+
+const base = import.meta.env.BASE_URL;
+const docs = await getCollection("docs");
+const byId = new Map(docs.map((d) => [d.id, d]));
+const titleOf = (id: string) =>
+  byId.get(id)?.data.title ?? DOC_TITLES[id] ?? (id.split("/").at(-1) ?? id).replace(/[-_]/g, " ");
+const href = (h: string) => (/^https?:/.test(h) ? h : `${base}${h.replace(/^\//, "")}`);
+const demo = `${base}demo/dev-guru-explorer.html`;
+const views = [
+  { id: "constellation", q: "What's here?", title: "Constellation", text: "Every file as a point of light, clustered by package. Hover and its imports glow." },
+  { id: "flow", q: "What depends on what?", title: "Flow", text: "Entry side to foundations, by package or file. Cycles glow rose." },
+  { id: "impact", q: "What breaks if this changes?", title: "Impact", text: "Blast-radius rings: importers and callers, hop by hop." },
+  { id: "calls", q: "Who calls in, what goes out?", title: "Calls", text: "A symbol-level ego network around any file." },
+  { id: "hotspots", q: "Where is change expensive?", title: "Hotspots", text: "Big files many others depend on, at a glance." },
+  { id: "tour", q: "Show me around", title: "Tour", text: "A narrated walk: packages, entry points, cycles, limits." },
+];
+---
+
+<Layout title={site.name}>
+  <section class="hero lantern">
+    <canvas class="embers" id="embers" aria-hidden="true"></canvas>
+    <div class="hero-content">
+      <p class="eyebrow" data-reveal>{site.eyebrow}</p>
+      <h1 data-reveal style="--d: .05s">
+        <span class="h1-lead">{site.headline}</span>
+        <span class="hl">{site.highlight}</span>
+      </h1>
+      <p class="lede" data-reveal style="--d: .1s">{site.lede}</p>
+      <div class="hero-actions" data-reveal style="--d: .15s">
+        {site.ctas.map((c, i) => (<a class:list={["btn", { ghost: i > 0 }]} data-magnetic href={href(c.href)}>{c.label}</a>))}
+      </div>
+      <div class="install-line" data-reveal style="--d: .2s"><span>$ {site.install}</span></div>
+    </div>
+    <div data-reveal style="--d: .12s">
+      <div class="window">
+        <div class="window-bar"><i></i><i></i><i></i><span>dev explore . -o explorer.html</span><a href={demo} target="_blank" rel="noopener">Open full screen ↗</a></div>
+        <iframe src={`${demo}#view=constellation&embed=1`} title="Live Dev Guru explorer of Dev Guru's own code" loading="lazy"></iframe>
+      </div>
+      <p class="window-caption">Live: Dev Guru exploring its own source. Drag, zoom, hover, press <kbd>/</kbd> to search.</p>
+    </div>
+  </section>
+
+  {STATS.length > 0 && (
+    <div class="stats">
+      {STATS.map((s, i) => (
+        <div class={`card stat t-${s.tint}`} data-tilt data-reveal style={`--d:${i * 0.05}s`}><strong data-countup>{s.value}</strong><span>{s.label}</span></div>
+      ))}
+    </div>
+  )}
+
+  <h2 data-reveal>Six ways to see your code</h2>
+  <p class="section-lede" data-reveal>Every report holds all six views over the same data. Each card opens that view of the live demo.</p>
+  <div class="views">
+    {views.map((v, i) => (
+      <a class="view-card" href={`${demo}#view=${v.id}`} target="_blank" rel="noopener" data-reveal style={`--d:${i * 0.04}s`}>
+        <svg class="mini" viewBox="0 0 300 120" aria-hidden="true">
+          {v.id === "constellation" && (<g>
+            {[[40,40],[70,70],[60,25],[150,60],[175,35],[190,80],[240,45],[260,85],[220,20],[110,95]].map(([x, y], k) => (<circle class="star" cx={x} cy={y} r={k % 3 ? 4 : 7} fill={["#ffb347","#13a898","#8f73ff","#e94f7a"][k % 4]} />))}
+            <path class="flow" d="M40,40 Q100,20 150,60 T240,45" stroke="#ffb347" fill="none" stroke-width="2" />
+            <path class="flow" d="M70,70 Q130,110 190,80 T260,85" stroke="#13a898" fill="none" stroke-width="2" />
+          </g>)}
+          {v.id === "flow" && (<g>
+            {[20, 110, 200].map((x, c) => [25, 60, 95].slice(0, c === 1 ? 3 : 2).map((y) => (<rect x={x} y={y - 11} width="78" height="22" rx="6" fill="#1c1422" stroke={["#ffb347","#13a898","#8f73ff"][c]} />)))}
+            <path class="flow" d="M98,25 C140,25 140,60 110,60" stroke="#8f73ff" fill="none" stroke-width="2" />
+            <path class="flow" d="M98,60 C150,60 160,95 200,95" stroke="#ffb347" fill="none" stroke-width="2" />
+            <path class="flow" d="M188,60 C220,60 200,25 200,25" stroke="#e94f7a" fill="none" stroke-width="2" />
+          </g>)}
+          {v.id === "impact" && (<g>
+            <circle cx="150" cy="60" r="22" fill="none" stroke="#34253a" stroke-dasharray="3 5" /><circle cx="150" cy="60" r="44" fill="none" stroke="#34253a" stroke-dasharray="3 5" />
+            <circle class="ripple" cx="150" cy="60" r="6" fill="none" stroke="#ffb347" stroke-width="2" /><circle class="ripple b" cx="150" cy="60" r="6" fill="none" stroke="#ff6b3d" stroke-width="2" /><circle class="ripple c" cx="150" cy="60" r="6" fill="none" stroke="#e94f7a" stroke-width="2" />
+            <circle cx="150" cy="60" r="9" fill="#13a898" /><circle cx="172" cy="60" r="4" fill="#ffb347" /><circle cx="135" cy="44" r="4" fill="#ffb347" /><circle cx="150" cy="104" r="4" fill="#ff6b3d" /><circle cx="108" cy="72" r="4" fill="#ff6b3d" />
+          </g>)}
+          {v.id === "calls" && (<g>
+            {[30, 60, 90].map((y) => (<rect x="20" y={y - 9} width="70" height="18" rx="5" fill="#1c1422" stroke="#8f73ff" />))}
+            {[25, 50, 75, 100].map((y) => (<rect x="115" y={y - 9} width="70" height="18" rx="5" fill="#261a2e" stroke="#ffb347" />))}
+            {[40, 80].map((y) => (<rect x="210" y={y - 9} width="70" height="18" rx="5" fill="#1c1422" stroke="#13a898" />))}
+            <path class="flow" d="M90,30 C105,30 100,25 115,25" stroke="#13a898" fill="none" stroke-width="1.6" /><path class="flow" d="M90,90 C105,90 100,75 115,75" stroke="#13a898" fill="none" stroke-width="1.6" /><path class="flow" d="M185,50 C200,50 195,40 210,40" stroke="#13a898" fill="none" stroke-width="1.6" /><path class="flow" d="M185,100 C200,100 195,80 210,80" stroke="#13a898" fill="none" stroke-width="1.6" />
+          </g>)}
+          {v.id === "hotspots" && (<g>
+            {([[10,10,90,100,"#ffb347"],[104,10,70,60,"#ff6b3d"],[104,74,70,36,"#ffd27a"],[178,10,52,45,"#13a898"],[234,10,56,45,"#ffd27a"],[178,59,40,51,"#13a898"],[222,59,68,51,"#ffb347"]] as [number, number, number, number, string][]).map(([x, y, w, h, c]) => (<rect class="bar" x={x} y={y} width={w} height={h} rx="5" fill={c} />))}
+          </g>)}
+          {v.id === "tour" && (<g>
+            <path d="M10,90 C60,10 120,110 180,40 S260,60 290,20" stroke="#34253a" fill="none" stroke-width="2" stroke-dasharray="4 6" />
+            {[[60,52],[180,40],[290,20]].map(([x, y]) => (<circle cx={x} cy={y} r="5" fill="#13a898" />))}
+            <circle class="comet" r="7" fill="#ffd27a" style="filter: drop-shadow(0 0 8px #ffb347)" />
+          </g>)}
+        </svg>
+        <span class="q">{v.q}</span>
+        <strong>{v.title}</strong>
+        <p>{v.text}</p>
+      </a>
+    ))}
+  </div>
+
+  <h2 data-reveal>How it works</h2>
+  <div class="pipeline" data-reveal>
+    <div class="pipe"><span class="who">you</span><b>Your code</b><span>Any Python project on your machine. Nothing leaves it.</span></div>
+    <div class="pipe"><span class="who">Ananke Plexus</span><b>Code graph</b><span>Files, classes, functions, imports, inferred calls and bases.</span></div>
+    <div class="pipe"><span class="who">Dev Guru</span><b>View model</b><span>Packages, impact, cycles, hotspots, source snippets, limits.</span></div>
+    <div class="pipe"><span class="who">you</span><b>One HTML file</b><span>Offline, view-only, traceable. Share it like a PDF.</span></div>
+  </div>
+  <div class="terminal" data-reveal><img src={`${base}flows/dev-explore.svg`} alt="An animated terminal running dev doctor and dev explore with real output" loading="lazy" /></div>
+
+  <h2 data-reveal>Safe to share</h2>
+  <div class="promises">
+    <div class="promise" data-reveal><span class="ic">🏮</span><b>Offline, always</b><p>Everything inlined, system fonts, and a page policy of <code>connect-src 'none'</code>. It can't phone home.</p></div>
+    <div class="promise" data-reveal style="--d:.05s"><span class="ic">🛡️</span><b>Source stays text</b><p>Escaped JSON and <code>textContent</code> only: a hostile docstring is just words. Tested in Chrome every release.</p></div>
+    <div class="promise" data-reveal style="--d:.1s"><span class="ic">🧾</span><b>Traceable</b><p>A manifest pins the renderer, the Dev Guru and Ananke versions, the input digest and the git revision.</p></div>
+    <div class="promise" data-reveal style="--d:.15s"><span class="ic">👁️</span><b>View-only</b><p>Opening a report runs nothing. Deeper analysis is a request file you choose to run.</p></div>
+  </div>
+
+  <h2 data-reveal>Browse the documentation</h2>
+  <div class="grid-cards">
+    {DOC_NAV.map((section) => (
+      <section class={`card t-${section.tint}`} data-reveal>
+        <p class="sidebar-heading"><Glyph shapes={section.shapes} tint={section.tint} class="" />{section.section}</p>
+        <ul style="margin:0;padding-left:18px">
+          {section.items.filter((id) => byId.has(id)).map((id) => (<li><a href={docHref(base, id)}>{id === "index" ? "Overview" : titleOf(id)}</a></li>))}
+        </ul>
+      </section>
+    ))}
+  </div>
+
+  <script>
+    // Embers rising from the lantern: a small canvas drift, paused for reduced motion and when off screen.
+    const canvas = document.getElementById("embers") as HTMLCanvasElement | null;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches || new URLSearchParams(location.search).get("motion") === "static";
+    if (canvas && !reduce) {
+      const ctx = canvas.getContext("2d")!;
+      const sparks: { x: number; y: number; r: number; v: number; s: number; a: number }[] = [];
+      let w = 0, h = 0, visible = true;
+      const size = () => { const r = canvas.getBoundingClientRect(); w = canvas.width = r.width * devicePixelRatio; h = canvas.height = r.height * devicePixelRatio; };
+      size(); window.addEventListener("resize", size);
+      new IntersectionObserver(([e]) => (visible = e.isIntersecting)).observe(canvas);
+      for (let i = 0; i < 70; i++) sparks.push({ x: Math.random() * w, y: Math.random() * h, r: (0.6 + Math.random() * 1.8) * devicePixelRatio, v: 0.2 + Math.random() * 0.7, s: Math.random() * 6, a: Math.random() });
+      const tick = (t: number) => {
+        if (visible) {
+          ctx.clearRect(0, 0, w, h);
+          for (const p of sparks) {
+            p.y -= p.v * devicePixelRatio; p.x += Math.sin(t / 900 + p.s) * 0.35 * devicePixelRatio;
+            if (p.y < -10) { p.y = h + 10; p.x = Math.random() * w; }
+            const fade = Math.min(1, p.y / h) * (0.55 + 0.45 * Math.sin(t / 400 + p.s));
+            const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 4);
+            g.addColorStop(0, `rgba(255,210,122,${fade})`); g.addColorStop(0.4, `rgba(255,140,60,${fade * 0.5})`); g.addColorStop(1, "rgba(255,107,61,0)");
+            ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, p.r * 4, 0, Math.PI * 2); ctx.fill();
+          }
+        }
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }
+  </script>
+</Layout>

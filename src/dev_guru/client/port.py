@@ -38,6 +38,34 @@ class GraphSummary(BaseModel):
     source: str  # where Ananke stored the snapshot (Ananke-owned workspace state)
 
 
+class GraphNodeData(BaseModel):
+    id: str
+    kind: str
+    name: str
+    path: str = ""
+    metadata: dict[str, object] = Field(default_factory=dict)
+
+
+class GraphEdgeData(BaseModel):
+    source: str
+    target: str
+    kind: str
+    origin: str = "extracted"
+    confidence: float = 1.0
+    location: str = ""
+
+
+class GraphData(BaseModel):
+    """The graph Ananke built, as plain data. Dev Guru projects it; it never adds analysis of its own."""
+
+    snapshot_id: str
+    provider: str
+    ananke_version: str | None
+    nodes: list[GraphNodeData] = Field(default_factory=list)
+    edges: list[GraphEdgeData] = Field(default_factory=list)
+    source: str = ""
+
+
 @runtime_checkable
 class AnankeClient(Protocol):
     transport: str
@@ -46,5 +74,14 @@ class AnankeClient(Protocol):
 
     def graph_summary(self, workspace: Path) -> GraphSummary: ...
 
+    def graph_data(self, workspace: Path) -> GraphData: ...
 
-__all__ = ["AnankeClient", "GraphSummary", "HarnessInfo"]
+
+__all__ = [
+    "AnankeClient",
+    "GraphData",
+    "GraphEdgeData",
+    "GraphNodeData",
+    "GraphSummary",
+    "HarnessInfo",
+]

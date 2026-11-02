@@ -15,7 +15,7 @@ from pytest_bdd import then  # noqa: E402
 
 collect_ignore = ["fixtures", "site"]  # fixture projects may carry their own tests; they are data here
 
-VERSION_FILE = "src/dev_guru/__init__.py"
+VERSION_FILE = "src/dev_guru/version.py"
 
 
 @then("the output names the package version")

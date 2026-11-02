@@ -1,0 +1,34 @@
+---
+title: Dev Guru
+description: Understand, improve, verify and learn from your software, locally. A developer product on the Ananke Plexus harness.
+---
+
+# Dev Guru
+
+Dev Guru turns your codebase into something you can **see and question**. Point it at a project and it writes one
+interactive, offline HTML report: a living map of packages and files, the flow of dependencies, the blast radius of a
+change, who calls what, where the hotspots are, and a guided tour, with the source one click away.
+
+```bash
+pip install dev-guru
+dev explore path/to/project -o explorer.html --open
+```
+
+Everything is computed locally by [Ananke Plexus](https://neo-pragnya.github.io/Ananke-Plexus/), the engineering
+harness Dev Guru runs on. The report is one file: no server, no network, nothing to install to view it.
+
+## What you can do today
+
+| Command | What you get |
+| --- | --- |
+| `dev explore` | The explorer report: constellation, flow, impact rings, calls, hotspots and a tour |
+| `dev doctor` | Checks that a compatible Ananke is installed and has what Dev Guru needs |
+| `GuruClient(...).explore()` | The same, from Python |
+
+## Where to go next
+
+- [Getting started](guides/getting-started.md): install, explore your first project, read the report.
+- [The explorer](guides/explorer.md): every view, and what it tells you.
+- [Python SDK](guides/sdk.md): use Dev Guru from scripts and notebooks.
+- [How it fits together](concepts/architecture.md): Dev Guru, Ananke Plexus and Dex Trove.
+- [Report safety](concepts/report-safety.md): why a report can't run code or phone home.

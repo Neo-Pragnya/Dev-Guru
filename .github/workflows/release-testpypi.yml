@@ -1,0 +1,158 @@
+name: release-testpypi
+
+# Publishes to TestPyPI on every version tag for pre-release validation.
+# Uses the same build-once pattern as release-pypi.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  # TestPyPI is optional. Enable it once TestPyPI has a trusted publisher (or a UV_PUBLISH_TOKEN_TESTPYPI secret):
+  #   gh variable set TESTPYPI_ENABLED --body true
+  testpypi-disabled:
+    name: TestPyPI not configured (skipped)
+    runs-on: ubuntu-latest
+    if: vars.TESTPYPI_ENABLED != 'true'
+    steps:
+      - name: Explain how to enable TestPyPI
+        run: |
+          {
+            echo "### TestPyPI publishing is off"
+            echo "Add a trusted publisher on https://test.pypi.org/manage/account/publishing/ for this repository"
+            echo "(workflow \`release-testpypi.yml\`, environment \`testpypi\`), then run:"
+            echo ""
+            echo "    gh variable set TESTPYPI_ENABLED --body true"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ── 1. Build ───────────────────────────────────────────────────────────────
+  build:
+    name: build artifacts
+    runs-on: ubuntu-latest
+    outputs:
+      published: ${{ steps.testpypi.outputs.published }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081
+        with:
+          version: "latest"
+          enable-cache: false  # never restore caches into release builds (cache poisoning)
+
+      - name: Verify package version matches release tag
+        run: |
+          VERSION="$(uv run python -c 'from dev_guru.version import __version__; print(__version__)')"
+          TAG="${GITHUB_REF_NAME#v}"
+          if [ "$VERSION" != "$TAG" ]; then
+            echo "Version mismatch: package version ($VERSION) does not match tag ($TAG)."
+            exit 1
+          fi
+
+      - name: Already on TestPyPI?
+        id: testpypi
+        run: |
+          code="$(curl -s -o /dev/null -w '%{http_code}' "https://test.pypi.org/pypi/dev-guru/${GITHUB_REF_NAME#v}/json")"
+          echo "published=$([ "$code" = 200 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - name: Build wheel and sdist
+        run: uv build
+
+      - name: Validate package metadata
+        run: uv run --with twine twine check dist/*
+
+      - name: Upload dist artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: testpypi-dist-${{ github.ref_name }}
+          path: dist/
+          if-no-files-found: error
+
+  # ── 2. Trivy security gate ─────────────────────────────────────────────────
+  trivy:
+    name: trivy security gate
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Install Trivy
+        uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        with:
+          version: v0.74.0
+
+      - name: Trivy blocking gate (CRITICAL only for TestPyPI)
+        run: |
+          trivy fs \
+            --cache-dir .trivy-cache \
+            --ignorefile .trivyignore \
+            --skip-dirs website \
+            --ignore-unfixed \
+            --severity CRITICAL \
+            --exit-code 1 \
+            .
+
+  # ── 3. Build provenance attestation ───────────────────────────────────────
+  provenance:
+    name: attest provenance
+    runs-on: ubuntu-latest
+    needs: [build, trivy]
+    permissions:
+      id-token: write
+      contents: read
+      attestations: write
+    steps:
+      - name: Download dist
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: testpypi-dist-${{ github.ref_name }}
+          path: dist/
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45
+        with:
+          subject-path: "dist/*"
+
+  # ── 4. Publish to TestPyPI ─────────────────────────────────────────────────
+  publish:
+    name: publish to TestPyPI
+    runs-on: ubuntu-latest
+    needs: [build, trivy, provenance]
+    if: vars.TESTPYPI_ENABLED == 'true' && needs.build.outputs.published != 'true'
+    environment: testpypi
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Download exact dist artifacts from build step
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: testpypi-dist-${{ github.ref_name }}
+          path: dist/
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081
+        with:
+          version: "latest"
+          enable-cache: false  # never restore caches into release builds (cache poisoning)
+
+      - name: Publish to TestPyPI
+        env:
+          UV_PUBLISH_TOKEN: ${{ secrets.UV_PUBLISH_TOKEN_TESTPYPI }}
+        run: |
+          uv publish \
+            --publish-url https://test.pypi.org/legacy/ \
+            --trusted-publishing automatic

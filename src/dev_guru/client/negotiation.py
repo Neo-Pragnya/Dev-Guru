@@ -11,8 +11,8 @@ import importlib
 import re
 from importlib import metadata
 
-SUPPORTED_ANANKE = ">=0.3.11,<0.4"  # keep in step with pyproject.toml (tests/test_packaging.py)
-_MIN = (0, 3, 11)
+SUPPORTED_ANANKE = ">=0.3.12,<0.4"  # keep in step with pyproject.toml (tests/test_packaging.py)
+_MIN = (0, 3, 12)
 _BELOW = (0, 4, 0)
 
 # Capability id -> (module, attribute path). Required ones are what this release of Dev Guru calls.

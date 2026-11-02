@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dev_guru import errors
 from dev_guru.client.inprocess import InProcessAnanke
-from dev_guru.client.port import AnankeClient, GraphSummary, HarnessInfo
+from dev_guru.client.port import AnankeClient, GraphData, GraphSummary, HarnessInfo
 
 TRANSPORTS = ("in-process",)  # planned: "process" (isolated executable), "gateway" (local HTTP)
 
@@ -19,4 +19,4 @@ def connect(transport: str = "in-process") -> AnankeClient:
     )
 
 
-__all__ = ["TRANSPORTS", "AnankeClient", "GraphSummary", "HarnessInfo", "connect"]
+__all__ = ["TRANSPORTS", "AnankeClient", "GraphData", "GraphSummary", "HarnessInfo", "connect"]

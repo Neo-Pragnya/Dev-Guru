@@ -13,7 +13,7 @@ transport don't exist yet. The audit is in Ananke Plexus: `docs/reference/three-
 
 - All harness access goes through `dev_guru.client.AnankeClient`. Nothing else in Dev Guru imports `ananke`.
 - The first transport is **in-process**, over the existing public facade and services.
-- **Negotiation is explicit.** `SUPPORTED_ANANKE = ">=0.3.11,<0.4"` matches the declared dependency (tested).
+- **Negotiation is explicit.** `SUPPORTED_ANANKE = ">=0.3.12,<0.4"` (it was `>=0.3.11` before Dev Guru 0.1.0 needed the call graph) matches the declared dependency (tested).
   Capabilities are probed by import (nothing runs). `graph.build` and `graph.load` are required.
 - **No silent fallback.** An unknown or failing transport is a `GuruError`. The caller chooses the transport, and
   each run records it.

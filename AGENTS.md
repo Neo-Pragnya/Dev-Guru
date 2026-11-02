@@ -36,7 +36,8 @@ make verify             # lint, format check, mypy --strict, tests
 make acceptance         # capability scenarios (dev install)
 make acceptance-wheel   # the same against the built wheel (what ships)
 make scan               # distribution scan of dist/
-uv run devguru doctor   # harness check
+uv run dev doctor       # harness check
+uv run dev explore . -o explorer.html   # the explorer report of this repo
 ```
 
 `acceptance/harness.py` and `scripts/scan_dist.py` are byte-identical copies from Ananke Plexus. Change them there.

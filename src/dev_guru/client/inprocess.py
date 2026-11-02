@@ -5,9 +5,9 @@ from __future__ import annotations
 from collections import Counter
 from pathlib import Path
 
+import dev_guru.client.negotiation as negotiation
 from dev_guru import errors
-from dev_guru.client import negotiation
-from dev_guru.client.port import GraphSummary, HarnessInfo
+from dev_guru.client.port import GraphData, GraphEdgeData, GraphNodeData, GraphSummary, HarnessInfo
 
 
 class InProcessAnanke:
@@ -60,9 +60,9 @@ class InProcessAnanke:
             )
         return info
 
-    def graph_summary(self, workspace: Path) -> GraphSummary:
-        """Ask Ananke to build the workspace graph, then summarise the snapshot it stored."""
-        self.require_compatible()
+    def graph_data(self, workspace: Path) -> GraphData:
+        """Ask Ananke to build the workspace graph and return the snapshot it stored."""
+        info = self.require_compatible()
         root = workspace.expanduser().resolve()
         if not root.is_dir():
             raise errors.GuruError(errors.WORKSPACE_INVALID, f"workspace {root} is not a directory")
@@ -81,14 +81,41 @@ class InProcessAnanke:
             raise errors.GuruError(
                 errors.HARNESS_FAILED, "Ananke reported a graph build but stored no snapshot"
             )
-        return GraphSummary(
+        return GraphData(
             snapshot_id=snapshot.snapshot_id,
             provider=snapshot.provider,
-            nodes=len(snapshot.nodes),
-            edges=len(snapshot.edges),
-            nodes_by_kind=dict(sorted(Counter(n.kind for n in snapshot.nodes).items())),
-            edges_by_kind=dict(sorted(Counter(e.kind for e in snapshot.edges).items())),
+            ananke_version=info.ananke_version,
+            nodes=[
+                GraphNodeData(
+                    id=n.node_id, kind=n.kind, name=n.name, path=n.path, metadata=dict(n.metadata)
+                )
+                for n in snapshot.nodes
+            ],
+            edges=[
+                GraphEdgeData(
+                    source=e.source,
+                    target=e.target,
+                    kind=e.kind,
+                    origin=e.origin,
+                    confidence=e.confidence,
+                    location=e.source_location,
+                )
+                for e in snapshot.edges
+            ],
             source=str(result.details.get("path", "")),
+        )
+
+    def graph_summary(self, workspace: Path) -> GraphSummary:
+        """Ask Ananke to build the workspace graph, then summarise the snapshot it stored."""
+        data = self.graph_data(workspace)
+        return GraphSummary(
+            snapshot_id=data.snapshot_id,
+            provider=data.provider,
+            nodes=len(data.nodes),
+            edges=len(data.edges),
+            nodes_by_kind=dict(sorted(Counter(n.kind for n in data.nodes).items())),
+            edges_by_kind=dict(sorted(Counter(e.kind for e in data.edges).items())),
+            source=data.source,
         )
 
 
