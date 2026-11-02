@@ -23,7 +23,11 @@ class ExploreResult:
 
 
 def explore(
-    workspace: Path, *, client: AnankeClient | None = None, name: str | None = None
+    workspace: Path,
+    *,
+    client: AnankeClient | None = None,
+    name: str | None = None,
+    profile: str = "private",
 ) -> ExploreResult:
     client = client or connect()
     root = workspace.expanduser().resolve()
@@ -39,6 +43,15 @@ def explore(
         model, workspace=root, ananke_version=graph.ananke_version, snapshot_id=graph.snapshot_id
     )
     report_manifest["transport"] = client.transport
+    from dev_guru.reports import profiles
+
+    if profile not in profiles.PROFILES:
+        raise errors.GuruError(
+            errors.INVALID_INPUT,
+            f"unknown profile {profile!r}",
+            hint=f"use one of: {', '.join(profiles.PROFILES)}",
+        )
+    model, report_manifest = profiles.apply(model, report_manifest, profile)
     return ExploreResult(
         workspace=root, model=model, manifest=report_manifest, transport=client.transport
     )

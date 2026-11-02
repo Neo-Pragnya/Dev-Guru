@@ -20,3 +20,23 @@ A report embeds your source code and is meant to be shared, so it's built to be 
 These guarantees are tested on every release. A browser test opens a report generated from a hostile fixture, where
 a docstring is `</script><script>window.__pwned = 1</script>`. It checks that the text shows up as text, that no
 `<img>` or `<script>` appears in the inspector, that nothing ran, and that no request left `file://`.
+
+## Publication profiles
+
+A report made for your own machine can show everything: the source of each class and function, docstrings, and
+the Git revision it came from. Before you publish one outside the team, use the **public** profile:
+
+```bash
+dev explore . -o explorer.html --profile public
+```
+
+| | `private` (default) | `public` |
+| --- | --- | --- |
+| files, packages, sizes, imports, calls, cycles, hotspots | ✓ | ✓ |
+| signatures | ✓ | ✓, with string defaults blanked (`url='…'`) |
+| source of classes and functions | ✓ | removed |
+| docstrings | ✓ | removed |
+| Git commit and dirty flag | ✓ | removed |
+
+The report lists what was removed among its limitations, the manifest records `"profile": "public"`, and the input
+digest covers exactly what the published report contains.

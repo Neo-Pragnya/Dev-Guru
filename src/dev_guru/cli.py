@@ -11,6 +11,7 @@ from typing import Annotated
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 
 from dev_guru import errors, service
 from dev_guru.client import TRANSPORTS, connect
@@ -112,6 +113,12 @@ def explore(
         bool, typer.Option("--open", help="Open the report when it's written")
     ] = False,
     transport: TransportOpt = "in-process",
+    profile: Annotated[
+        str,
+        typer.Option(
+            help="private (everything) or public (no source, docstrings or Git revision: safe to publish)"
+        ),
+    ] = "private",
     as_json: JsonOpt = False,
 ) -> None:
     """Explore a codebase: Ananke builds the graph, Dev Guru writes an interactive, offline HTML explorer.
@@ -120,7 +127,7 @@ def explore(
     call graph, hotspots, a guided tour, search and a source inspector.
     """
     try:
-        result = service.explore(workspace, client=connect(transport), name=name)
+        result = service.explore(workspace, client=connect(transport), name=name, profile=profile)
         page, sidecar = service.export_html(result, output)
     except errors.GuruError as exc:
         _fail(exc, as_json, 1)
@@ -147,3 +154,55 @@ def explore(
         console.print(f"  [dim]manifest {sidecar} · {result.manifest['input_digest'][:19]}…[/dim]")
     if open_browser:
         webbrowser.open(page.resolve().as_uri())
+
+
+@app.command()
+def present(
+    slides: Annotated[
+        Path, typer.Argument(help="Markdown slides (separate slides with a line of ---)")
+    ],
+    output: Annotated[Path | None, typer.Option("--output", "-o", help="Deck file")] = None,
+    theme: Annotated[
+        str | None, typer.Option(help="lantern (dark) or paper (light); default from front matter")
+    ] = None,
+    check_only: Annotated[
+        bool, typer.Option("--check", help="Check an existing HTML deck instead of building")
+    ] = False,
+    open_browser: Annotated[
+        bool, typer.Option("--open", help="Open the deck when it's written")
+    ] = False,
+) -> None:
+    """Turn Markdown slides into one offline, accessible HTML deck (arrow keys, N for notes, print to PDF).
+
+    Raw HTML is shown as text, images must be local with alt text, charts come from ```chart JSON blocks, and the
+    page can't make network requests. --check verifies a built deck.
+    """
+    from dev_guru import present as deck
+
+    if check_only:
+        problems = deck.check(slides.read_text(encoding="utf-8"))
+        for p in problems:
+            err.print(f"[red]✗[/red] {p}")
+        if problems:
+            raise typer.Exit(1)
+        console.print(f"[green]✓[/green] {slides}: offline and accessible checks pass")
+        return
+    try:
+        page = deck.build(slides.read_text(encoding="utf-8"), slides.parent, theme=theme)
+    except (deck.DeckError, OSError) as exc:
+        err.print(
+            f"[red]✗ {escape(str(exc))}[/red]"
+        )  # the message quotes Markdown like ![alt](src)
+        raise typer.Exit(2) from exc
+    problems = deck.check(page)
+    if (
+        problems
+    ):  # a bug in the renderer, not the author's input: never write a deck that fails its own check
+        err.print("[red]✗ built deck failed its checks: " + "; ".join(problems) + "[/red]")
+        raise typer.Exit(1)
+    out = output or slides.with_suffix(".html")
+    out.write_text(page, encoding="utf-8")
+    n = page.count('class="slide"')
+    console.print(f"[green]✓[/green] {n} slides → {out}")
+    if open_browser:
+        webbrowser.open(out.resolve().as_uri())

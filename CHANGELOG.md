@@ -8,6 +8,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
 
 ## [Unreleased]
 
+### Added
+
+- **`dev present`**: Markdown slides become one offline, accessible HTML deck:
+  - `lantern` and `paper` themes, responsive columns, step-by-step lists, speaker notes, keyboard navigation;
+  - bar charts as accessible SVG;
+  - embedded local images that require alt text; raw HTML is shown as text;
+  - `--check` verifies a deck. Guide: [Presentations](docs/guides/presentations.md).
+- **Publication profiles** for `dev explore` (`--profile public`): removes source, docstrings, string defaults in
+  signatures and the Git revision, so a report is safe to publish. The manifest records the profile.
+
 ---
 
 ## [0.1.1] — 2026-11-02

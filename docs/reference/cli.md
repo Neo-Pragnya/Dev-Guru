@@ -23,7 +23,7 @@ when compatible, `1` when Ananke is missing or incompatible, and `2` for an unkn
 ## `dev explore`
 
 ```text
-dev explore [WORKSPACE] [-o, --output FILE] [--name NAME] [--open] [--transport in-process] [--json]
+dev explore [WORKSPACE] [-o, --output FILE] [--name NAME] [--open] [--transport in-process] [--profile private|public] [--json]
 ```
 
 | Option | Default | Meaning |
@@ -32,8 +32,19 @@ dev explore [WORKSPACE] [-o, --output FILE] [--name NAME] [--open] [--transport 
 | `-o, --output` | `dev-guru-explorer.html` | the report; `<output>.manifest.json` is written next to it |
 | `--name` | the folder name | project name shown in the report |
 | `--open` | off | open the report in your browser once it's written |
+| `--profile` | `private` | `public` removes source code, docstrings, string defaults in signatures and the Git revision, so the report is safe to publish; see [report safety](../concepts/report-safety.md#publication-profiles) |
 | `--json` | off | print `report`, `manifest`, `input_digest`, `project` counts and insight counts |
 
 Exit `0` on success. Exit `1` with a stable error code (`WORKSPACE_INVALID`, `HARNESS_MISSING`, …) when nothing can
 be explored. An empty folder is an error, never an empty report. Set `SOURCE_DATE_EPOCH` for a reproducible
 `generated_at`.
+
+## `dev present`
+
+```text
+dev present SLIDES.md [-o, --output FILE] [--theme lantern|paper] [--open]
+dev present DECK.html --check
+```
+
+Turns Markdown slides into one offline, accessible HTML deck. See [Presentations](../guides/presentations.md).
+Exit `2` on an authoring error (it names the slide content to fix), `1` if a deck fails `--check`.

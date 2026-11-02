@@ -76,6 +76,7 @@ export const DOC_NAV: { section: string; items: string[]; shapes: string; tint: 
     "items": [
       "guides/explorer",
       "guides/getting-started",
+      "guides/presentations",
       "guides/sdk"
     ],
     "shapes": "hex>flower8",
@@ -110,6 +111,7 @@ export const DOC_TITLES: Record<string, string> = {
   "concepts/report-safety": "Report safety",
   "guides/explorer": "The explorer",
   "guides/getting-started": "Getting started",
+  "guides/presentations": "Presentations",
   "guides/sdk": "Python SDK",
   "reference/cli": "CLI reference",
   "reference/report-format": "Report format"

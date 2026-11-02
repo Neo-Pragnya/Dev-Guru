@@ -156,3 +156,39 @@ def test_placeholders_inside_source_are_not_substituted(tmp_path: Path) -> None:
     start = page.index(marker) + len(marker)
     data = json.loads(page[start : page.index("</script>", start)])
     assert data["symbols"][0]["source"].startswith('values = {"{{DATA}}"')
+
+
+def test_public_profile_strips_code_text_and_revision(tmp_path: Path) -> None:
+    from dev_guru.reports import profiles
+
+    model = {
+        "schema": "dev-guru/explorer@1",
+        "project": {"name": "p"},
+        "limitations": [],
+        "files": [{"path": "a.py", "doc": "Internal: talk to Bob"}],
+        "symbols": [
+            {
+                "name": "f",
+                "source": "SECRET_LOGIC = 1",
+                "doc": "uses the private API",
+                "signature": "f(x)",
+            }
+        ],
+    }
+    manifest = {
+        "workspace": {"name": "p", "vcs": "git", "commit": "abc123", "dirty": True},
+        "input_digest": "x",
+    }
+    pub_model, pub_manifest = profiles.apply(model, manifest, "public")
+    dumped = json.dumps([pub_model, pub_manifest])
+    assert (
+        "SECRET_LOGIC" not in dumped and "talk to Bob" not in dumped and "private API" not in dumped
+    )
+    assert "abc123" not in dumped and pub_manifest["profile"] == "public"
+    assert (
+        pub_model["symbols"][0]["signature"] == "f(x)"
+        and profiles.PUBLIC_NOTE in pub_model["limitations"]
+    )
+    assert model["symbols"][0]["source"] == "SECRET_LOGIC = 1"  # the caller's copy is untouched
+    same_model, same_manifest = profiles.apply(model, manifest, "private")
+    assert same_model == model and same_manifest["profile"] == "private"
