@@ -1,0 +1,3 @@
+# Trivy ignore list for the release and security gates. Empty on purpose: add an advisory id only with a reason
+# and a re-check date, e.g.
+#   CVE-YYYY-NNNNN  # no fix released; only reachable through <optional extra>; re-check YYYY-MM-DD
