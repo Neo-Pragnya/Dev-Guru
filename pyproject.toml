@@ -65,7 +65,8 @@ path = "src/dev_guru/version.py"
 packages = ["src/dev_guru"]  # includes reports/assets (the explorer page, styles and script)
 
 [tool.hatch.build.targets.sdist]
-include = ["src", "tests", "README.md", "LICENSE", "CHANGELOG.md"]
+# Anchored: an unanchored "src" also matched website/node_modules/*/src and shipped 2,754 npm files.
+include = ["/src", "/tests", "/README.md", "/LICENSE", "/CHANGELOG.md"]
 
 [tool.ruff]
 line-length = 100

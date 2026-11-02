@@ -27,3 +27,14 @@ def test_dex_is_optional_and_never_imported_by_the_core() -> None:
 
 def test_no_node_runtime_is_needed_to_install() -> None:
     assert not list(SRC.rglob("package.json")) and not list(SRC.rglob("node_modules"))
+
+
+def test_the_sdist_ships_only_the_package_and_its_tests(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    import subprocess
+    import tarfile
+
+    subprocess.run(["uv", "build", "--sdist", "-o", str(tmp_path), "-q"], cwd=ROOT, check=True)
+    [sdist] = tmp_path.glob("*.tar.gz")
+    with tarfile.open(sdist) as tar:
+        tops = {n.split("/", 2)[1] for n in tar.getnames() if n.count("/") >= 1}
+    assert tops <= {"src", "tests", "README.md", "LICENSE", "CHANGELOG.md", "pyproject.toml", "PKG-INFO", ".gitignore"}, tops
