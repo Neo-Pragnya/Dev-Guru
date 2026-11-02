@@ -49,7 +49,7 @@ class GuruClient:
     ) -> Path:
         if format != "html":
             raise ValueError(f"unsupported export format {format!r}; supported: html")
-        page, _ = service.export_html(result, Path(output), title=title)
+        page, _ = service.export_html(result, Path(output), title=title, client=self.client)
         return page
 
 

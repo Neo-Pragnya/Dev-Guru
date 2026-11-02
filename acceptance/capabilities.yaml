@@ -15,6 +15,7 @@ capabilities:
   - { id: report-safety, title: "Reports are offline, view-only and treat source as text (hostile input stays inert)", dimension: safety, blocker: true }
   - { id: report-browser, title: "In real Chrome every view renders; search, palette, tour and theme work; fits a phone", dimension: experience, blocker: true }
   - { id: present, title: "dev present: offline, accessible decks; remote images and raw HTML refused", dimension: core, blocker: true }
+  - { id: sources, title: "Source-neutral discovery; explore runs through the Ananke app facade and records the report; Dex-free", dimension: core, blocker: true }
   - { id: cli-ux, title: "Errors are clean, carry stable codes, and refusals exit non-zero", dimension: usability, blocker: false }
 
 # Every user-facing command.
@@ -23,3 +24,5 @@ surface:
   - dev doctor
   - dev explore
   - dev present
+  - dev sources
+  - dev learning review

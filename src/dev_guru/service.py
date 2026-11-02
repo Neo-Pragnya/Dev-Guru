@@ -20,6 +20,7 @@ class ExploreResult:
     model: dict[str, Any]
     manifest: dict[str, Any]
     transport: str
+    run_id: str = ""  # the Ananke run that produced the graph, when the transport has runs
 
 
 def explore(
@@ -43,6 +44,8 @@ def explore(
         model, workspace=root, ananke_version=graph.ananke_version, snapshot_id=graph.snapshot_id
     )
     report_manifest["transport"] = client.transport
+    if graph.run_id:
+        report_manifest["ananke_run"] = {"run_id": graph.run_id, "protocol": "ananke-app/1"}
     from dev_guru.reports import profiles
 
     if profile not in profiles.PROFILES:
@@ -53,14 +56,33 @@ def explore(
         )
     model, report_manifest = profiles.apply(model, report_manifest, profile)
     return ExploreResult(
-        workspace=root, model=model, manifest=report_manifest, transport=client.transport
+        workspace=root,
+        model=model,
+        manifest=report_manifest,
+        transport=client.transport,
+        run_id=graph.run_id,
     )
 
 
 def export_html(
-    result: ExploreResult, output: Path, *, title: str | None = None
+    result: ExploreResult,
+    output: Path,
+    *,
+    title: str | None = None,
+    client: AnankeClient | None = None,
 ) -> tuple[Path, Path]:
-    return render.write(result.model, result.manifest, output, title=title)
+    """Write the report, then record it in the Ananke run it came from (when the transport has runs)."""
+    page, sidecar = render.write(result.model, result.manifest, output, title=title)
+    if client is not None and result.run_id:
+        client.register_artifact(
+            result.workspace,
+            result.run_id,
+            page.name,
+            page.read_bytes(),
+            media_type="text/html",
+            input_refs=["graph-snapshot.json", str(result.manifest["input_digest"])],
+        )
+    return page, sidecar
 
 
 __all__ = ["ExploreResult", "explore", "export_html"]

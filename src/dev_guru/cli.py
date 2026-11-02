@@ -127,8 +127,9 @@ def explore(
     call graph, hotspots, a guided tour, search and a source inspector.
     """
     try:
-        result = service.explore(workspace, client=connect(transport), name=name, profile=profile)
-        page, sidecar = service.export_html(result, output)
+        client = connect(transport)
+        result = service.explore(workspace, client=client, name=name, profile=profile)
+        page, sidecar = service.export_html(result, output, client=client)
     except errors.GuruError as exc:
         _fail(exc, as_json, 1)
         return
@@ -204,5 +205,82 @@ def present(
     out.write_text(page, encoding="utf-8")
     n = page.count('class="slide"')
     console.print(f"[green]✓[/green] {n} slides → {out}")
+    if open_browser:
+        webbrowser.open(out.resolve().as_uri())
+
+
+@app.command()
+def sources(
+    query: Annotated[str, typer.Argument(help="Words to match (optional)")] = "",
+    workspace: Annotated[
+        Path, typer.Option("--workspace", "-w", help="Project whose sources to read")
+    ] = Path("."),
+    html_out: Annotated[
+        Path | None, typer.Option("--html", help="Also write an offline picker page")
+    ] = None,
+    transport: TransportOpt = "in-process",
+    as_json: JsonOpt = False,
+) -> None:
+    """Browse capabilities from every source the project configures (internal folders, private Git, troves).
+
+    Source-neutral: Dev Guru asks Ananke's provider port; Dex Trove is just one optional source.
+    """
+    from dev_guru.reports import pages
+
+    try:
+        found = connect(transport).discover_capabilities(workspace, query)
+    except errors.GuruError as exc:
+        _fail(exc, as_json, 1)
+        return
+    rows = [c.model_dump() for c in found]
+    if html_out is not None:
+        html_out.write_text(pages.sources_page(rows), encoding="utf-8")
+    if as_json:
+        console.print_json(json.dumps(rows))
+        return
+    for c in found:
+        console.print(f"{c.identity}@{c.version}  [dim]{escape(c.summary[:80])}[/dim]")
+    console.print(f"{len(found)} capabilities" + (f" · picker: {html_out}" if html_out else ""))
+
+
+learning_app = typer.Typer(
+    help="Review what Ananke learned before it becomes reusable memory.", no_args_is_help=True
+)
+app.add_typer(learning_app, name="learning")
+
+
+@learning_app.command("review")
+def learning_review(
+    name: Annotated[str, typer.Argument(help="Candidate name (see `ananke learning list`)")],
+    workspace: Annotated[Path, typer.Option("--workspace", "-w")] = Path("."),
+    output: Annotated[
+        Path | None, typer.Option("--output", "-o", help="Review page (default <name>-review.html)")
+    ] = None,
+    open_browser: Annotated[bool, typer.Option("--open")] = False,
+    transport: TransportOpt = "in-process",
+    as_json: JsonOpt = False,
+) -> None:
+    """A review page for a learning candidate: gate status, evaluation, review, provenance and per-destination diff.
+
+    Reviewing changes nothing: approve with `ananke learning review` and promote with `ananke learning promote`.
+    """
+    from dev_guru.reports import pages
+
+    try:
+        cand = connect(transport).learning_candidate(workspace, name)
+    except errors.GuruError as exc:
+        _fail(exc, as_json, 1)
+        return
+    out = output or Path(f"{name}-review.html")
+    out.write_text(pages.review_page(cand.model_dump()), encoding="utf-8")
+    if as_json:
+        console.print_json(json.dumps(cand.model_dump() | {"page": str(out)}))
+    else:
+        state = (
+            "[green]ready to promote[/green]"
+            if not cand.problems
+            else "[yellow]" + escape("; ".join(cand.problems)) + "[/yellow]"
+        )
+        console.print(f"{name}: {state} → {out}")
     if open_browser:
         webbrowser.open(out.resolve().as_uri())

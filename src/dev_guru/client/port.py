@@ -64,6 +64,40 @@ class GraphData(BaseModel):
     nodes: list[GraphNodeData] = Field(default_factory=list)
     edges: list[GraphEdgeData] = Field(default_factory=list)
     source: str = ""
+    run_id: str = ""  # the Ananke run that produced this graph (app facade)
+
+
+class CapabilityInfo(BaseModel):
+    """One capability a source offers, as the provider port describes it."""
+
+    identity: str
+    kind: str
+    version: str
+    digest: str
+    summary: str = ""
+    licence: str = "unknown"
+    unknown: list[str] = Field(default_factory=list)
+
+
+class Destination(BaseModel):
+    source: str
+    writable: bool
+    visibility: str = "internal"
+    existing_version: str | None = None
+    diff: str = ""
+
+
+class LearningCandidate(BaseModel):
+    """A learning candidate as Ananke's gate sees it, plus how it would change each writable destination."""
+
+    name: str
+    skill_md: str
+    cases: list[dict[str, object]] = Field(default_factory=list)
+    evaluated_at: str | None = None
+    review: dict[str, str] | None = None
+    provenance: dict[str, object] = Field(default_factory=dict)
+    problems: list[str] = Field(default_factory=list)
+    destinations: list[Destination] = Field(default_factory=list)
 
 
 @runtime_checkable
@@ -76,12 +110,30 @@ class AnankeClient(Protocol):
 
     def graph_data(self, workspace: Path) -> GraphData: ...
 
+    def register_artifact(
+        self,
+        workspace: Path,
+        run_id: str,
+        name: str,
+        data: bytes,
+        *,
+        media_type: str,
+        input_refs: list[str],
+    ) -> dict[str, object]: ...
+
+    def discover_capabilities(self, workspace: Path, query: str = "") -> list[CapabilityInfo]: ...
+
+    def learning_candidate(self, workspace: Path, name: str) -> LearningCandidate: ...
+
 
 __all__ = [
     "AnankeClient",
+    "CapabilityInfo",
+    "Destination",
     "GraphData",
     "GraphEdgeData",
     "GraphNodeData",
     "GraphSummary",
     "HarnessInfo",
+    "LearningCandidate",
 ]

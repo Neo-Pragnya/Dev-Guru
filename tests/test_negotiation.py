@@ -11,7 +11,8 @@ from dev_guru.client import inprocess, negotiation
 @pytest.mark.parametrize(
     ("version", "ok"),
     [
-        ("0.3.12", True),
+        ("0.3.13", True),
+        ("0.3.12", False),
         ("0.3.99", True),
         ("0.3.11", False),
         ("0.4.0", False),
@@ -55,7 +56,11 @@ def test_out_of_range_harness_is_incompatible(monkeypatch: pytest.MonkeyPatch) -
 
 
 def test_missing_required_capability_is_its_own_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(negotiation, "probe", lambda *a: {"graph.build": True, "graph.load": False})
+    monkeypatch.setattr(
+        negotiation,
+        "probe",
+        lambda *a: {"graph.build": True, "graph.load": False, "app.facade": True},
+    )
     info = inprocess.InProcessAnanke().info()
     assert info.missing_required == ["graph.load"] and not info.compatible
     with pytest.raises(errors.GuruError) as exc:

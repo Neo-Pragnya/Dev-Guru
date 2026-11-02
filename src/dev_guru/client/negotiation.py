@@ -11,8 +11,9 @@ import importlib
 import re
 from importlib import metadata
 
-SUPPORTED_ANANKE = ">=0.3.12,<0.4"  # keep in step with pyproject.toml (tests/test_packaging.py)
-_MIN = (0, 3, 12)
+SUPPORTED_ANANKE = ">=0.3.13,<0.4"  # keep in step with pyproject.toml (tests/test_packaging.py)
+_MIN = (0, 3, 13)
+APP_PROTOCOL = "ananke-app/1"  # the app facade protocol this Dev Guru speaks
 _BELOW = (0, 4, 0)
 
 # Capability id -> (module, attribute path). Required ones are what this release of Dev Guru calls.
@@ -23,8 +24,11 @@ CAPABILITIES: dict[str, tuple[str, str]] = {
     "run.status": ("ananke.plexus.api", "Ananke.run_status"),
     "spec.create": ("ananke.plexus.api", "Ananke.create_spec"),
     "registry.open": ("ananke.plexus.registry.registry", "Registry.open"),
+    "app.facade": ("ananke.plexus.app", "AppFacade.submit_run"),
+    "sources.discover": ("ananke.plexus.registry.providers", "from_project"),
+    "learning.gate": ("ananke.plexus.learning", "gate"),
 }
-REQUIRED = ("graph.build", "graph.load")
+REQUIRED = ("graph.build", "graph.load", "app.facade")
 
 
 def parse_version(text: str) -> tuple[int, int, int] | None:
