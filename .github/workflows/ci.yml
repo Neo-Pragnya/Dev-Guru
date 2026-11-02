@@ -1,0 +1,90 @@
+name: ci
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: quality (${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: uv sync --all-extras --python ${{ matrix.python-version }}
+
+      - name: Lint (ruff check)
+        run: uv run ruff check src tests
+
+      - name: Format check (ruff format)
+        run: uv run ruff format --check src tests
+
+      - name: Type check (mypy)
+        run: uv run --python 3.12 mypy
+
+      - name: Tests with coverage
+        run: uv run pytest --cov=src/dev_guru --cov-report=term --cov-fail-under=85
+
+  dist-scan:
+    name: build + distribution scan (what package firewalls check)
+    runs-on: ubuntu-latest
+    needs: quality
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081
+        with:
+          version: "latest"
+          enable-cache: false
+
+      - name: Install pinned scanners
+        env:
+          GITLEAKS_VERSION: "8.30.1"
+          GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+        run: |
+          curl -sSLo gitleaks.tgz "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tgz" | sha256sum -c -
+          mkdir -p "$HOME/.local/bin" && tar -xzf gitleaks.tgz -C "$HOME/.local/bin" gitleaks && rm gitleaks.tgz
+          uv tool install --python 3.12 guarddog==3.2.0
+          uv tool install --python 3.12 pip-audit==2.10.1
+          uv tool install --python 3.12 bandit==1.9.4
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Build wheel and sdist
+        run: uv build
+
+      - name: Scan the wheel and sdist (secrets and vulnerable dependencies block)
+        run: python3 scripts/scan_dist.py --dist dist --out scan-report --require-all
+
+      - name: Upload scan report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: dist-scan
+          path: scan-report/
+          if-no-files-found: warn

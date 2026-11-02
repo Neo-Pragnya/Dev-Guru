@@ -1,0 +1,113 @@
+name: security
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  schedule:
+    - cron: "0 3 * * 1"  # weekly Monday 03:00 UTC
+
+permissions:
+  contents: read
+
+jobs:
+  trivy:
+    name: trivy filesystem scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Install Trivy
+        uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        with:
+          version: v0.74.0
+
+      - name: Trivy SARIF (all severities → Security tab)
+        run: |
+          trivy fs --cache-dir .trivy-cache --ignore-unfixed --severity CRITICAL,HIGH,MEDIUM \
+            --format sarif --output trivy-results.sarif .
+
+      - name: Upload SARIF to GitHub Security
+        uses: github/codeql-action/upload-sarif@ed1a0fa18ac745d017ca370dd4ef08bba3b4f504
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy
+
+      - name: Trivy blocking gate (CRITICAL + HIGH unfixed)
+        run: trivy fs --cache-dir .trivy-cache --ignore-unfixed --severity CRITICAL,HIGH --exit-code 1 .
+
+  sast:
+    name: semgrep SAST
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081
+        with:
+          version: "latest"
+
+      - name: Semgrep scan
+        run: |
+          uv run --no-project --with semgrep semgrep scan --config auto --sarif \
+            --output semgrep-results.sarif src/ || true
+
+      - name: Upload Semgrep SARIF
+        uses: github/codeql-action/upload-sarif@ed1a0fa18ac745d017ca370dd4ef08bba3b4f504
+        if: always()
+        with:
+          sarif_file: semgrep-results.sarif
+          category: semgrep
+        continue-on-error: true
+
+  dependency-audit:
+    name: pip-audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081
+        with:
+          version: "latest"
+
+      - name: pip-audit (blocking on known CVEs)
+        run: |
+          uv sync --all-extras
+          uv run --with pip-audit pip-audit
+
+  secrets:
+    name: gitleaks (git history)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Gitleaks (pinned binary)
+        env:
+          GITLEAKS_VERSION: "8.30.1"
+          GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+        run: |
+          curl -sSLo gitleaks.tgz "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tgz" | sha256sum -c -
+          tar -xzf gitleaks.tgz gitleaks && rm gitleaks.tgz
+          ./gitleaks git . --no-banner --redact --exit-code 1

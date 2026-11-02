@@ -1,0 +1,50 @@
+"""The one port between Dev Guru and the Ananke harness.
+
+Dev Guru never analyses code itself: every domain operation goes through an :class:`AnankeClient`. Today there is
+one transport (``in-process``: the installed ``ananke-plexus`` package). An isolated executable and a local HTTP
+gateway are planned. Exactly one transport is chosen per run and recorded; a failing transport is reported, never
+silently swapped for another (docs/decisions/0001-ananke-client-port.md).
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Protocol, runtime_checkable
+
+from pydantic import BaseModel, Field
+
+
+class HarnessInfo(BaseModel):
+    """What negotiation found: the transport, harness version, support verdict and capabilities."""
+
+    transport: str
+    ananke_version: str | None
+    supported_range: str
+    compatible: bool
+    capabilities: dict[str, bool] = Field(default_factory=dict)
+    missing_required: list[str] = Field(default_factory=list)
+    reasons: list[str] = Field(default_factory=list)
+
+
+class GraphSummary(BaseModel):
+    """A bounded projection of an Ananke graph snapshot. Ananke keeps the snapshot itself."""
+
+    snapshot_id: str
+    provider: str
+    nodes: int
+    edges: int
+    nodes_by_kind: dict[str, int] = Field(default_factory=dict)
+    edges_by_kind: dict[str, int] = Field(default_factory=dict)
+    source: str  # where Ananke stored the snapshot (Ananke-owned workspace state)
+
+
+@runtime_checkable
+class AnankeClient(Protocol):
+    transport: str
+
+    def info(self) -> HarnessInfo: ...
+
+    def graph_summary(self, workspace: Path) -> GraphSummary: ...
+
+
+__all__ = ["AnankeClient", "GraphSummary", "HarnessInfo"]

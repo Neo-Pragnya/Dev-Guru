@@ -1,0 +1,19 @@
+# What Dev Guru must be able to do before a release, and how much of the CLI the scenarios exercise.
+# Scenarios prove capabilities by tagging themselves @cap_<id> (dots and dashes become underscores).
+# blocker: true → a failing or unproven capability BLOCKs the release; the rest hold it at CONDITIONAL.
+product: Dev Guru
+default_fixture: shop
+binaries: [devguru]
+surface_target: 0.9
+
+capabilities:
+  - { id: packaging, title: "Installs cleanly: entry point, version, fast start, no Node at runtime", dimension: release, blocker: true }
+  - { id: harness, title: "Negotiates the Ananke harness: version range, required capabilities, one explicit transport", dimension: core, blocker: true }
+  - { id: harness-graph, title: "The SDK reaches real Ananke analysis (graph of a fixture project), not a mock", dimension: core, blocker: true }
+  - { id: dex-optional, title: "Works without Dex Trove; the core never imports it", dimension: architecture, blocker: true }
+  - { id: cli-ux, title: "Errors are clean, carry stable codes, and refusals exit non-zero", dimension: usability, blocker: false }
+
+# Every user-facing command.
+surface:
+  - devguru
+  - devguru doctor

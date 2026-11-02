@@ -1,0 +1,69 @@
+"""Which Ananke Plexus this Dev Guru supports, and what the installed one can do.
+
+Negotiation is explicit: Dev Guru reads the installed harness version, checks it against ``SUPPORTED_ANANKE`` and
+probes the specific interfaces it calls. An out-of-range or incomplete harness is an error with a stable code,
+never a silent downgrade.
+"""
+
+from __future__ import annotations
+
+import importlib
+import re
+from importlib import metadata
+
+SUPPORTED_ANANKE = ">=0.3.11,<0.4"  # keep in step with pyproject.toml (tests/test_packaging.py)
+_MIN = (0, 3, 11)
+_BELOW = (0, 4, 0)
+
+# Capability id -> (module, attribute path). Required ones are what this release of Dev Guru calls.
+CAPABILITIES: dict[str, tuple[str, str]] = {
+    "graph.build": ("ananke.plexus.api", "Ananke.graph_build"),
+    "graph.load": ("ananke.plexus.graph.service", "load_graph"),
+    "graph.impact": ("ananke.plexus.api", "Ananke.graph_impact"),
+    "run.status": ("ananke.plexus.api", "Ananke.run_status"),
+    "spec.create": ("ananke.plexus.api", "Ananke.create_spec"),
+    "registry.open": ("ananke.plexus.registry.registry", "Registry.open"),
+}
+REQUIRED = ("graph.build", "graph.load")
+
+
+def parse_version(text: str) -> tuple[int, int, int] | None:
+    m = re.match(r"^(\d+)\.(\d+)\.(\d+)", text.strip())
+    return (int(m.group(1)), int(m.group(2)), int(m.group(3))) if m else None
+
+
+def supported(version: str) -> bool:
+    parsed = parse_version(version)
+    return parsed is not None and _MIN <= parsed < _BELOW
+
+
+def installed_version(distribution: str = "ananke-plexus") -> str | None:
+    try:
+        return metadata.version(distribution)
+    except metadata.PackageNotFoundError:
+        return None
+
+
+def probe(capabilities: dict[str, tuple[str, str]] = CAPABILITIES) -> dict[str, bool]:
+    """Which capabilities the importable harness exposes (imports only; nothing runs)."""
+    found: dict[str, bool] = {}
+    for cap, (module, attr_path) in capabilities.items():
+        try:
+            obj: object = importlib.import_module(module)
+            for part in attr_path.split("."):
+                obj = getattr(obj, part)
+            found[cap] = callable(obj)
+        except (ImportError, AttributeError):
+            found[cap] = False
+    return found
+
+
+__all__ = [
+    "CAPABILITIES",
+    "REQUIRED",
+    "SUPPORTED_ANANKE",
+    "installed_version",
+    "parse_version",
+    "probe",
+    "supported",
+]
