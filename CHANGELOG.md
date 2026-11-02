@@ -10,6 +10,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
 
 ---
 
+## [0.1.1] — 2026-11-02
+
+### Changed
+
+- **The constellation is a 3D force-directed graph.** Imports are springs, files repel each other and packages pull
+  their files together. Drag to orbit, scroll to zoom, drag a file to pull the graph, double-click to fly to a file;
+  it turns slowly when idle. Shaded bodies, depth fog, a star field and pulses along lit imports, with labels that
+  never overlap. Drawn on a plain canvas inside the report: no WebGL, no library, no network. With reduced motion it
+  settles before the first frame and stays still.
+- Docs: the client-port design is now a plain concept page, [How Dev Guru talks to Ananke](docs/concepts/ananke-client.md).
+  PyPI links on the README, the docs home and the site.
+
+### Fixed
+
+- `.trivyignore` added, so the release workflow's Trivy gate can run.
+
+---
+
 ## [0.1.0] — 2026-11-02
 
 The first release.

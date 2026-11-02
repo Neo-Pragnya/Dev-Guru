@@ -46,4 +46,4 @@ filtering of already-loaded data, form validation) is Dev Guru's.
 3. **Local web app (later)**: Dev Guru serves precompiled UI assets and a loopback API; every domain action routes to
    Ananke.
 
-Each run records the transport it used. See [ADR-0001](../decisions/0001-ananke-client-port.md).
+Each run records the transport it used. See [How Dev Guru talks to Ananke](ananke-client.md).

@@ -37,4 +37,13 @@ def test_the_sdist_ships_only_the_package_and_its_tests(tmp_path) -> None:  # ty
     [sdist] = tmp_path.glob("*.tar.gz")
     with tarfile.open(sdist) as tar:
         tops = {n.split("/", 2)[1] for n in tar.getnames() if n.count("/") >= 1}
-    assert tops <= {"src", "tests", "README.md", "LICENSE", "CHANGELOG.md", "pyproject.toml", "PKG-INFO", ".gitignore"}, tops
+    assert tops <= {
+        "src",
+        "tests",
+        "README.md",
+        "LICENSE",
+        "CHANGELOG.md",
+        "pyproject.toml",
+        "PKG-INFO",
+        ".gitignore",
+    }, tops

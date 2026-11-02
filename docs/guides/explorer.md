@@ -21,9 +21,18 @@ flowchart LR
 
 ## ✦ Constellation: what's here?
 
-Every file is a glowing point, clustered by package. Size shows lines of code, and colour shows the package. Hover
-over a file and its imports and importers light up, with pulses travelling along the connections. Import cycles
-glow rose.
+Every file is a body in a 3D force-directed graph. Imports act as springs, files repel each other, and each package
+pulls its own files together, so the structure of the code becomes the shape in space. Size shows lines of code,
+colour shows the package, and nearer bodies are brighter.
+
+- **Drag** the background to orbit, **scroll** to zoom, and use **⤢** (or `F`) to fit everything in view.
+- **Drag a file** to pull it: the graph follows and settles again.
+- **Hover** a file and its imports and importers light up, with pulses travelling along the connections.
+- **Click** to open it in the inspector, and **double-click** to fly to it.
+- Import cycles glow rose. When you leave it alone, the graph turns slowly.
+
+It is drawn on a plain canvas by the report itself (no WebGL, no library), and with reduced motion it settles
+before the first frame and stays still.
 
 ## ⇶ Flow: what depends on what?
 

@@ -1,9 +1,12 @@
 # Dev Guru
 
+[![PyPI](https://img.shields.io/pypi/v/dev-guru)](https://pypi.org/project/dev-guru/)
+[![Python](https://img.shields.io/pypi/pyversions/dev-guru)](https://pypi.org/project/dev-guru/)
+
 **See your code. Understand it. Change it with confidence.**
 
 Point Dev Guru at a Python project and get **one offline HTML explorer**:
-- a living constellation of packages and files;
+- a 3D constellation of files you can orbit, where imports pull and packages cluster;
 - the flow of dependencies;
 - the blast radius of a change;
 - who calls what, and where the hotspots are;
@@ -19,14 +22,14 @@ dev explore path/to/project -o explorer.html --open
 
 ![Dev Guru running dev doctor and dev explore](docs/assets/dev-explore.svg)
 
-**[Documentation and a live demo →](https://neo-pragnya.github.io/Dev-Guru/)**: the site's hero runs the real
+**[Documentation and a live demo →](https://neo-pragnya.github.io/Dev-Guru/)** · **[Dev Guru on PyPI →](https://pypi.org/project/dev-guru/)**: the site's hero runs the real
 report of Dev Guru exploring its own source.
 
 ## What's in a report
 
 | View | Question it answers |
 | --- | --- |
-| ✦ Constellation | What's here? Files clustered by package; hover to light up imports |
+| ✦ Constellation | What's here? A 3D force-directed graph: drag to orbit, hover to light up imports |
 | ⇶ Flow | What depends on what? Entry side to foundations; cycles glow rose |
 | ◎ Impact | What breaks if this changes? Blast-radius rings over importers and callers |
 | ƒ Calls | Who calls in, and what goes out? A symbol-level ego network |
@@ -56,7 +59,7 @@ with GuruClient(workspace="path/to/project") as guru:
 | [Dex Trove](https://github.com/Neo-Pragnya/Dex-Trove) | Optional capability memory: curated skills, agents, instructions and workflows |
 
 Dev Guru never analyses code itself: every domain operation goes through one client port to Ananke, and Dex is never
-required. See [Architecture](docs/concepts/architecture.md) and [ADR-0001](docs/decisions/0001-ananke-client-port.md).
+required. See [Architecture](docs/concepts/architecture.md) and [How Dev Guru talks to Ananke](docs/concepts/ananke-client.md).
 
 ## Quality gates
 

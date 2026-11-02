@@ -93,6 +93,7 @@
   }
   const applyCam = () => world && world.setAttribute("transform", `translate(${cam.x},${cam.y}) scale(${cam.k})`);
   function fit(pad = 40, box) {
+    if (space.active) return spaceFit();
     if (!world) return;
     const b = box || world.getBBox();
     const w = svg.clientWidth || 800, h = svg.clientHeight || 600;
@@ -118,6 +119,7 @@
     return m ? { x: +m[1], y: +m[2], k: +m[3] } : { ...cam };
   }
   function zoomBy(f, cx, cy) {
+    if (space.active) return spaceZoom(f);
     const w = svg.clientWidth, h = svg.clientHeight;
     cx = cx ?? w / 2; cy = cy ?? h / 2;
     const k = Math.max(0.08, Math.min(6, cam.k * f));
@@ -161,97 +163,315 @@
     return `M${a.x},${a.y} Q${mx - dy * bend},${my + dx * bend} ${b.x},${b.y}`;
   };
 
-  // ------------------------------------------------------------------ constellation layout (deterministic)
-  let constellation = null;
-  function layoutConstellation() {
-    if (constellation) return constellation;
-    const pos = new Map(), radius = new Map(), centers = [];
-    const GOLD = Math.PI * (3 - Math.sqrt(5));
-    // 1. each package: files on a sunflower around its own origin, then separate any overlaps locally
-    const local = new Map();
-    for (const p of D.packages) {
-      const ids = [...p.files].sort((x, y) => (files.get(y).loc - files.get(x).loc) || x.localeCompare(y));
-      ids.forEach((fid) => radius.set(fid, Math.max(4.5, Math.min(22, 3 + Math.sqrt(files.get(fid).loc || 1) * 0.8))));
-      const mean = ids.reduce((s, f) => s + radius.get(f), 0) / ids.length;
-      const pts = ids.map((fid, j) => ({ fid, x: Math.cos(j * GOLD) * (mean * 2 + 8) * 0.62 * Math.sqrt(j), y: Math.sin(j * GOLD) * (mean * 2 + 8) * 0.62 * Math.sqrt(j) }));
-      if (pts.length <= 400) for (let it = 0; it < 30; it++) {
-        for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) {
-          const a = pts[i], b = pts[j], min = radius.get(a.fid) + radius.get(b.fid) + 5;
-          let dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
-          if (d < min) { if (d < 0.01) { dx = 0.6; dy = 0.8; d = 1; } const k = (min - d) / 2 / d; a.x -= dx * k; a.y -= dy * k; b.x += dx * k; b.y += dy * k; }
-        }
-      }
-      const R = Math.max(26, ...pts.map((q) => Math.hypot(q.x, q.y) + radius.get(q.fid))) + 16;
-      local.set(p.id, { pts, R });
+  // ------------------------------------------------------------------ constellation: a 3D force-directed graph
+  // Files are bodies in space. Imports are springs, every file repels the others, each package pulls its own files
+  // together, and the whole graph is kept centred. Plain JavaScript on a 2D canvas: no WebGL, no library, no network.
+  const cvs = $("#space"), ctx = cvs.getContext("2d");
+  const space = { nodes: [], byId: new Map(), links: [], pkgs: [], groups: [], stars: [], yaw: 0.7, pitch: -0.3, dist: 900, cx: 0, cy: 0, cz: 0,
+    alpha: 0, active: false, hover: null, raf: 0, idleAt: 0, anim: null, built: false, moved: false, w: 800, h: 600, theme: null, sprites: new Map(), frames: 0 };
+  const hashOf = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return h >>> 0; };
+  const rng = (seed) => () => { seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+
+  function buildSpace() {
+    if (space.built) return;
+    space.built = true;
+    const GOLD = Math.PI * (3 - Math.sqrt(5)), P = D.packages.length, R0 = 60 * Math.cbrt(D.files.length) + 40;
+    D.packages.forEach((p, i) => {
+      const y = P === 1 ? 0 : 1 - (i / (P - 1)) * 2, r = Math.sqrt(Math.max(0, 1 - y * y)), a = i * GOLD;
+      space.pkgs.push({ id: p.id, ax: Math.cos(a) * r * R0, ay: y * R0, az: Math.sin(a) * r * R0, x: 0, y: 0, z: 0, n: 0, dx: 0, dy: 0, dz: 0 });
+      space.groups.push([]);
+    });
+    for (const f of D.files) {
+      const pi = pkgIndex.get(f.package) ?? 0, pk = space.pkgs[pi], rand = rng(hashOf(f.id)), j = 30 + Math.sqrt(D.packages[pi].files.length) * 8;
+      const n = { id: f.id, pkg: pi, r: Math.max(4, Math.min(19, 3 + Math.sqrt(f.loc || 1) * 0.72)), color: colorOf(f.id), deg: 0,
+        x: pk.ax + (rand() - 0.5) * j, y: pk.ay + (rand() - 0.5) * j, z: pk.az + (rand() - 0.5) * j, vx: 0, vy: 0, vz: 0, fx: null, fy: null, fz: null, sx: 0, sy: 0, ss: 0, depth: 0 };
+      space.nodes.push(n); space.byId.set(f.id, n); space.groups[pi].push(n);
     }
-    // 2. pack packages largest-first along a spiral, never overlapping
-    const order = [...D.packages].sort((a, b) => local.get(b.id).R - local.get(a.id).R || a.id.localeCompare(b.id));
-    for (const p of order) {
-      const R = local.get(p.id).R;
-      let x = 0, y = 0;
-      if (centers.length) {
-        for (let s = 0, a = 0, d = 0; s < 20000; s++, a += 0.32, d += 1.4) {
-          x = Math.cos(a) * d; y = Math.sin(a) * d * 0.82;
-          if (centers.every((c) => Math.hypot(c.x - x, c.y - y) >= c.r + R + 12)) break;
-        }
-      }
-      centers.push({ id: p.id, x, y, r: R });
-      for (const q of local.get(p.id).pts) pos.set(q.fid, { x: x + q.x, y: y + q.y });
+    for (const e of D.edges) {
+      const a = e.k === "imports" && space.byId.get(e.s), b = a && space.byId.get(e.t);
+      if (!a || !b || a === b) continue;
+      a.deg++; b.deg++;
+      space.links.push({ a, b, cycle: cyclePairs.has(e.s + "→" + e.t), cross: a.pkg !== b.pkg });
     }
-    constellation = { pos, radius, centers };
-    return constellation;
+    const sr = rng(7);
+    for (let i = 0; i < 320; i++) { const u = sr() * 2 - 1, t = sr() * Math.PI * 2, q = Math.sqrt(1 - u * u), R = R0 * (3 + sr() * 3); space.stars.push({ x: Math.cos(t) * q * R, y: u * R, z: Math.sin(t) * q * R, b: 0.3 + sr() * 0.7 }); }
+    space.alpha = 1;
+    // settle most of the way before the first frame; with reduced motion, settle completely
+    const t0 = performance.now(), budget = reduced ? 1500 : 90;
+    while (space.alpha > (reduced ? 0.002 : 0.12) && performance.now() - t0 < budget) tick();
   }
 
-  function drawConstellation({ highlight } = {}) {
+  function tick() {
+    const N = space.nodes, A = space.alpha, S = 30 * A;
+    for (const p of space.pkgs) { p.x = p.y = p.z = 0; p.n = 0; p.dx = p.dy = p.dz = 0; }
+    for (const n of N) { const p = space.pkgs[n.pkg]; p.x += n.x; p.y += n.y; p.z += n.z; p.n++; }
+    for (const p of space.pkgs) if (p.n) { p.x /= p.n; p.y /= p.n; p.z /= p.n; }
+    // repulsion: exact within a package, and between packages through their centres of mass
+    for (const g of space.groups) {
+      const step = Math.max(1, Math.ceil(g.length / 600));
+      for (let i = 0; i < g.length; i++) {
+        const u = g[i];
+        for (let j = i + 1; j < g.length; j += step) {
+          const v = g[j]; let dx = v.x - u.x, dy = v.y - u.y, dz = v.z - u.z, d2 = dx * dx + dy * dy + dz * dz;
+          if (d2 > 90000) continue;
+          if (d2 < 1) { dx = 0.5; dy = 0.3; dz = 0.2; d2 = 1; }
+          const w = (S * step) / d2;
+          u.vx -= dx * w; u.vy -= dy * w; u.vz -= dz * w; v.vx += dx * w; v.vy += dy * w; v.vz += dz * w;
+        }
+      }
+    }
+    const P = space.pkgs;
+    for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) {
+      const a = P[i], b = P[j]; if (!a.n || !b.n) continue;
+      let dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z, d2 = dx * dx + dy * dy + dz * dz;
+      if (d2 < 1) { dx = 1; d2 = 1; }
+      const w = (S * 0.5) / d2;
+      a.dx -= dx * w * b.n; a.dy -= dy * w * b.n; a.dz -= dz * w * b.n; b.dx += dx * w * a.n; b.dy += dy * w * a.n; b.dz += dz * w * a.n;
+    }
+    // imports are springs; a busy file moves less than a quiet one
+    for (const l of space.links) {
+      const { a, b } = l;
+      let dx = b.x + b.vx - a.x - a.vx, dy = b.y + b.vy - a.y - a.vy, dz = b.z + b.vz - a.z - a.vz;
+      const d = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1, rest = (l.cross ? 55 : 18) + a.r + b.r;
+      const k = ((d - rest) / d) * A * (l.cross ? 0.35 : 0.8) / Math.min(a.deg, b.deg), bias = a.deg / (a.deg + b.deg);
+      dx *= k; dy *= k; dz *= k;
+      b.vx -= dx * bias; b.vy -= dy * bias; b.vz -= dz * bias; a.vx += dx * (1 - bias); a.vy += dy * (1 - bias); a.vz += dz * (1 - bias);
+    }
+    let mx = 0, my = 0, mz = 0;
+    for (const n of N) {
+      const p = space.pkgs[n.pkg];
+      // each package pulls its files in, and a gentle gravity keeps loose packages from drifting off
+      n.vx += ((p.x - n.x) * 0.06 - n.x * 0.012) * A + p.dx; n.vy += ((p.y - n.y) * 0.06 - n.y * 0.012) * A + p.dy; n.vz += ((p.z - n.z) * 0.06 - n.z * 0.012) * A + p.dz;
+      n.vx *= 0.6; n.vy *= 0.6; n.vz *= 0.6;
+      if (n.fx !== null) { n.x = n.fx; n.y = n.fy; n.z = n.fz; n.vx = n.vy = n.vz = 0; } else { n.x += n.vx; n.y += n.vy; n.z += n.vz; }
+      mx += n.x; my += n.y; mz += n.z;
+    }
+    if (N.length) { mx /= N.length; my /= N.length; mz /= N.length; for (const n of N) { n.x -= mx; n.y -= my; n.z -= mz; if (n.fx !== null) { n.fx -= mx; n.fy -= my; n.fz -= mz; } } }
+    space.alpha += (0 - space.alpha) * 0.0228;
+    if (space.alpha < 0.002) space.alpha = 0;
+  }
+
+  // ---- camera: orbit (yaw, pitch) around a centre at a distance, perspective projection
+  function rot(x, y, z) {
+    const c = Math.cos(space.yaw), s = Math.sin(space.yaw), cp = Math.cos(space.pitch), sp = Math.sin(space.pitch);
+    const x1 = x * c - z * s, z1 = x * s + z * c;
+    return [x1, y * cp - z1 * sp, y * sp + z1 * cp];
+  }
+  function unrot(x1, y2, z2) {
+    const c = Math.cos(space.yaw), s = Math.sin(space.yaw), cp = Math.cos(space.pitch), sp = Math.sin(space.pitch);
+    const y = cp * y2 + sp * z2, z1 = -sp * y2 + cp * z2;
+    return [c * x1 + s * z1, y, -s * x1 + c * z1];
+  }
+  const focal = () => Math.min(space.w, space.h) * 1.1;
+  function proj(o) {
+    const [x, y, z] = rot(o.x - space.cx, o.y - space.cy, o.z - space.cz), depth = space.dist + z, s = depth > 12 ? focal() / depth : 0;
+    o.sx = space.w / 2 + x * s; o.sy = space.h / 2 + y * s; o.ss = s; o.depth = depth;
+  }
+  function sizeSpace() {
+    const r = cvs.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+    space.w = r.width || 800; space.h = r.height || 600;
+    cvs.width = Math.round(space.w * dpr); cvs.height = Math.round(space.h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  function spread(nodes, cx, cy, cz) {
+    const d = nodes.map((n) => Math.hypot(n.x - cx, n.y - cy, n.z - cz)).sort((a, b) => a - b);
+    return Math.max(40, d[Math.floor((d.length - 1) * 0.95)] || 40);
+  }
+  function flyTo(cx, cy, cz, dist) {
+    const to = { cx, cy, cz, dist: Math.max(60, Math.min(30000, dist)) };
+    if (reduced) { Object.assign(space, to); return wake(); }
+    space.anim = { from: { cx: space.cx, cy: space.cy, cz: space.cz, dist: space.dist }, to, t0: performance.now() };
+    wake();
+  }
+  const fitDist = (R) => (focal() * R) / (0.44 * Math.min(space.w, space.h)) + R * 0.35;
+  function spaceFit() { if (space.nodes.length) flyTo(0, 0, 0, fitDist(spread(space.nodes, 0, 0, 0))); }
+  function spaceFocus(id) {
+    const n = space.byId.get(id); if (!n) return spaceFit();
+    flyTo(n.x, n.y, n.z, Math.min(space.anim ? space.anim.to.dist : space.dist, fitDist(spread(space.nodes, 0, 0, 0)) * 0.55));
+  }
+  function spaceFocusPackage(pid) {
+    const i = pkgIndex.get(pid), g = space.groups[i]; if (!g || !g.length) return;
+    const c = g.reduce((a, n) => [a[0] + n.x / g.length, a[1] + n.y / g.length, a[2] + n.z / g.length], [0, 0, 0]);
+    flyTo(c[0], c[1], c[2], fitDist(spread(g, ...c)) * 1.1);
+  }
+  const spaceZoom = (f) => { space.dist = Math.max(60, Math.min(30000, space.dist / f)); space.anim = null; space.moved = true; wake(); };
+
+  // ---- drawing: stars, links with depth fog, shaded bodies sorted far to near, labels, pulses
+  function themeColors() {
+    const cs = getComputedStyle(document.documentElement), v = (k) => cs.getPropertyValue(k).trim();
+    return { ink: v("--ink"), muted: v("--muted"), faint: v("--faint"), bg: v("--bg-2"), saffron: v("--saffron"), rose: v("--rose"), day: document.documentElement.dataset.theme === "day" };
+  }
+  function sprite(color) {
+    if (space.sprites.has(color)) return space.sprites.get(color);
+    const c = document.createElement("canvas"); c.width = c.height = 64;
+    const g = c.getContext("2d"), grd = g.createRadialGradient(24, 22, 2, 32, 32, 30);
+    grd.addColorStop(0, "#ffffff"); grd.addColorStop(0.18, color); grd.addColorStop(0.85, color); grd.addColorStop(1, "rgba(0,0,0,0.55)");
+    g.fillStyle = grd; g.beginPath(); g.arc(32, 32, 30, 0, Math.PI * 2); g.fill();
+    const glow = document.createElement("canvas"); glow.width = glow.height = 64;
+    const h = glow.getContext("2d"), gg = h.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gg.addColorStop(0, color); gg.addColorStop(1, "rgba(0,0,0,0)");
+    h.fillStyle = gg; h.fillRect(0, 0, 64, 64);
+    const s = { body: c, glow }; space.sprites.set(color, s); return s;
+  }
+  function focusSet() {
+    const f = space.hover || (state.sel && fileOf(state.sel));
+    return f && space.byId.has(f) ? { id: f, near: new Set([f, ...get(out, f), ...get(inn, f)]) } : null;
+  }
+  function drawSpace(t) {
+    const C = ctx, T = space.theme || (space.theme = themeColors()), W = space.w, H = space.h;
+    C.clearRect(0, 0, W, H);
+    for (const s of space.stars) proj(s);
+    C.fillStyle = T.faint;
+    for (const s of space.stars) if (s.ss) { C.globalAlpha = s.b * 0.7; C.fillRect(s.sx, s.sy, s.b > 0.85 ? 1.8 : 1.1, s.b > 0.85 ? 1.8 : 1.1); }
+    const N = space.nodes; let dMin = Infinity, dMax = -Infinity;
+    for (const n of N) { proj(n); if (n.ss) { dMin = Math.min(dMin, n.depth); dMax = Math.max(dMax, n.depth); } }
+    const fog = (d) => 1 - 0.72 * Math.max(0, Math.min(1, (d - dMin) / (dMax - dMin + 1)));
+    const F = focusSet(), hotLinks = [];
+    C.lineWidth = 1;
+    if (state.filters.imports) for (const l of space.links) {
+      const { a, b } = l; if (!a.ss || !b.ss) continue;
+      const hot = F && (a.id === F.id || b.id === F.id);
+      if (hot) { hotLinks.push(l); continue; }
+      C.globalAlpha = (F ? 0.05 : l.cycle ? 0.75 : 0.32) * fog((a.depth + b.depth) / 2);
+      C.strokeStyle = l.cycle ? T.rose : T.day ? "#6a52e0" : "#9b87ff";
+      C.beginPath(); C.moveTo(a.sx, a.sy); C.lineTo(b.sx, b.sy); C.stroke();
+    }
+    C.lineWidth = 2; C.strokeStyle = T.saffron; C.globalAlpha = 0.95;
+    for (const { a, b } of hotLinks) { C.beginPath(); C.moveTo(a.sx, a.sy); C.lineTo(b.sx, b.sy); C.stroke(); }
+    const order = N.filter((n) => n.ss).sort((a, b) => b.depth - a.depth), sel = state.sel && fileOf(state.sel);
+    for (const n of order) {
+      const r = Math.max(1.2, n.r * n.ss), near = !F || F.near.has(n.id), sp = sprite(n.color);
+      C.globalAlpha = near ? fog(n.depth) : 0.12;
+      if (F && near || n.id === sel) { C.globalAlpha = 0.55; C.drawImage(sp.glow, n.sx - r * 3, n.sy - r * 3, r * 6, r * 6); C.globalAlpha = 1; }
+      C.drawImage(sp.body, n.sx - r, n.sy - r, r * 2, r * 2);
+      if (n.id === sel) { C.globalAlpha = 1; C.strokeStyle = T.saffron; C.lineWidth = 2.5; C.beginPath(); C.arc(n.sx, n.sy, r + 4, 0, Math.PI * 2); C.stroke(); }
+    }
+    // pulses travel from importer to imported along the lit links
+    if (hotLinks.length) {
+      C.fillStyle = T.saffron;
+      hotLinks.slice(0, 80).forEach(({ a, b }, i) => {
+        const f = ((t / 1400) + i * 0.17) % 1;
+        C.globalAlpha = Math.sin(f * Math.PI); C.beginPath(); C.arc(a.sx + (b.sx - a.sx) * f, a.sy + (b.sy - a.sy) * f, 2.6, 0, Math.PI * 2); C.fill();
+      });
+    }
+    // labels: package names at their centres, file names for lit, selected and large nearby bodies
+    // a label is drawn only where it does not cover one already drawn
+    const placed = [], free = (x, y, w) => { const b = [x - 2, y - 12, x + w + 2, y + 3]; if (placed.some((q) => b[0] < q[2] && b[2] > q[0] && b[1] < q[3] && b[3] > q[1])) return false; placed.push(b); return true; };
+    C.textAlign = "left"; C.font = "11px Inter, system-ui, sans-serif"; C.lineWidth = 3; C.strokeStyle = T.bg;
+    const named = F ? new Set([F.id, ...[...F.near].sort((x, y) => files.get(y).loc - files.get(x).loc).slice(0, 12)]) : null;
+    for (const n of [...order].reverse()) {
+      const f = files.get(n.id), lit = named && named.has(n.id), r = n.r * n.ss;
+      if (!(lit || n.id === sel || (!F && (r > 8 || ((f.entry || f.fan_in >= 4) && n.ss > 0.9))))) continue;
+      const x = n.sx + r + 4, y = n.sy + 4;
+      if (n.id !== sel && n.id !== F?.id && !free(x, y, C.measureText(f.name).width)) continue;
+      C.globalAlpha = lit || n.id === sel ? 1 : 0.75 * fog(n.depth); C.fillStyle = T.ink;
+      C.strokeText(f.name, x, y); C.fillText(f.name, x, y);
+    }
+    C.textAlign = "center"; C.font = "700 11px Inter, system-ui, sans-serif"; C.globalAlpha = F ? 0.35 : 0.8;
+    const big = [...space.groups.keys()].sort((x, y) => space.groups[y].length - space.groups[x].length).slice(0, 10);
+    for (const i of big) {
+      const g = space.groups[i]; if (!g.length) continue;
+      const c = g.reduce((o, n) => ({ x: o.x + n.x / g.length, y: o.y + n.y / g.length, z: o.z + n.z / g.length }), { x: 0, y: 0, z: 0 });
+      proj(c); if (!c.ss) continue;
+      const id = space.pkgs[i].id, top = Math.min(...g.map((n) => n.sy - n.r * n.ss)) - 10;
+      const text = (id === "." ? "(root)" : id.split("/").slice(-2).join("/")).toUpperCase(), w = C.measureText(text).width, y = Math.max(14, top);
+      if (!free(c.sx - w / 2, y, w)) continue;
+      C.fillStyle = T.faint; C.fillText(text, c.sx, y);
+    }
+    C.globalAlpha = 1;
+  }
+
+  let lastT = 0;
+  function loop(t) {
+    space.raf = 0;
+    if (!space.active) return;
+    const dt = Math.min(64, t - (lastT || t)); lastT = t;
+    if (space.alpha > 0) {
+      tick();
+      // while the graph settles, the camera keeps it framed, until someone takes the controls
+      if (!space.moved && !state.sel && !space.anim && (++space.frames % 4 === 0 || space.alpha === 0)) space.dist += (fitDist(spread(space.nodes, 0, 0, 0)) - space.dist) * (space.alpha === 0 ? 1 : 0.25);
+    }
+    if (space.anim) {
+      const a = space.anim, p = Math.min(1, (t - a.t0) / 650), e = 1 - Math.pow(1 - p, 3);
+      for (const k of ["cx", "cy", "cz", "dist"]) space[k] = a.from[k] + (a.to[k] - a.from[k]) * e;
+      if (p >= 1) space.anim = null;
+    }
+    if (!reduced && !sdrag && performance.now() - space.idleAt > 2500) space.yaw += 0.00011 * dt;
+    drawSpace(t);
+    if (!document.hidden && (!reduced || space.alpha > 0 || space.anim)) space.raf = requestAnimationFrame(loop);
+  }
+  function wake() { if (space.active && !space.raf) { lastT = 0; space.raf = requestAnimationFrame(loop); } }
+  document.addEventListener("visibilitychange", wake);
+
+  function pick(x, y) {
+    let best = null;
+    for (const n of space.nodes) {
+      if (!n.ss) continue;
+      const r = Math.max(6, n.r * n.ss) + 3, dx = n.sx - x, dy = n.sy - y;
+      if (dx * dx + dy * dy <= r * r && (!best || n.depth < best.depth)) best = n;
+    }
+    return best;
+  }
+  function setHover(id) {
+    if (space.hover === id) return;
+    space.hover = id;
+    const f = id || (state.sel && fileOf(state.sel));
+    cvs.style.cursor = id ? "pointer" : "";
+    $("#hint").textContent = f && files.has(f) ? `${files.get(f).path} · imports ${get(out, f).length} · imported by ${get(inn, f).length}` : "Drag to orbit · drag a file to pull it · scroll to zoom · double-click to fly to a file";
+    wake();
+  }
+  const local = (e) => { const r = cvs.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  let sdrag = null;
+  cvs.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    const [x, y] = local(e), hit = pick(x, y);
+    sdrag = { x: e.clientX, y: e.clientY, yaw: space.yaw, pitch: space.pitch, node: hit, moved: false };
+    space.idleAt = performance.now(); cvs.setPointerCapture(e.pointerId);
+  });
+  cvs.addEventListener("pointermove", (e) => {
+    const [x, y] = local(e);
+    if (!sdrag) { setHover(pick(x, y)?.id || null); return; }
+    const dx = e.clientX - sdrag.x, dy = e.clientY - sdrag.y;
+    if (Math.abs(dx) + Math.abs(dy) > 4 && !sdrag.moved) { sdrag.moved = true; cvs.classList.add("dragging"); }
+    if (!sdrag.moved) return;
+    space.idleAt = performance.now(); space.moved = true; space.anim = null;
+    if (sdrag.node) {
+      // move the body in the screen plane at its own depth, and let the graph follow
+      const n = sdrag.node, s = n.ss || 1, [ox, oy, oz] = unrot((x - space.w / 2) / s, (y - space.h / 2) / s, n.depth - space.dist);
+      n.fx = ox + space.cx; n.fy = oy + space.cy; n.fz = oz + space.cz;
+      space.alpha = Math.max(space.alpha, 0.3);
+    } else {
+      space.yaw = sdrag.yaw + dx * 0.006;
+      space.pitch = Math.max(-1.45, Math.min(1.45, sdrag.pitch + dy * 0.006));
+    }
+    wake();
+  });
+  const release = () => {
+    if (!sdrag) return;
+    const d = sdrag; sdrag = null; cvs.classList.remove("dragging");
+    if (d.node) { d.node.fx = d.node.fy = d.node.fz = null; if (!d.moved) select(d.node.id); }
+    space.idleAt = performance.now(); wake();
+  };
+  cvs.addEventListener("pointerup", release);
+  cvs.addEventListener("pointercancel", release);
+  cvs.addEventListener("pointerleave", () => { if (!sdrag) setHover(null); });
+  cvs.addEventListener("wheel", (e) => { e.preventDefault(); space.idleAt = performance.now(); spaceZoom(e.deltaY < 0 ? 1.12 : 1 / 1.12); }, { passive: false });
+  cvs.addEventListener("dblclick", (e) => { const [x, y] = local(e), n = pick(x, y); space.moved = true; if (n) spaceFocus(n.id); else spaceFit(); });
+
+  function drawConstellation() {
     resetStage();
-    const { pos, radius, centers } = layoutConstellation();
-    const gp = sv("g"), ge = sv("g"), gn = sv("g");
-    world.append(gp, ge, gn);
-    const bigR = [...centers].sort((a, b) => b.r - a.r)[Math.min(11, centers.length - 1)]?.r ?? 0;
-    for (const c of centers) {
-      gp.append(sv("circle", { class: "pkg-halo", cx: c.x, cy: c.y, r: c.r }));
-      if (c.r >= bigR || centers.length <= 12) gp.append(sv("text", { class: "pkg-label", x: c.x, y: c.y - c.r - 6, "text-anchor": "middle", text: c.id === "." ? "(root)" : c.id.split("/").slice(-2).join("/") }));
-    }
-    const edgeEls = [];
-    if (state.filters.imports) for (const e of D.edges) {
-      if (e.k !== "imports") continue;
-      const a = pos.get(e.s), b = pos.get(e.t);
-      if (!a || !b) continue;
-      const path = sv("path", { class: "edge imports" + (cyclePairs.has(e.s + "→" + e.t) ? " cycle" : ""), d: curve(a, b), "marker-end": "url(#arrow)" });
-      path.dataset.s = e.s; path.dataset.t = e.t;
-      ge.append(path); edgeEls.push(path);
-    }
-    const nodeEls = new Map();
-    for (const f of D.files) {
-      const p = pos.get(f.id), r = radius.get(f.id), color = colorOf(f.id);
-      const g = sv("g", { class: "node", transform: `translate(${p.x},${p.y})`, tabindex: "-1" });
-      g.append(sv("circle", { class: "halo", r: r + 7, fill: color, filter: "url(#glow)" }));
-      g.append(sv("circle", { class: "core", r, fill: color }));
-      if (r > 9 || f.entry || f.fan_in >= 3) g.append(sv("text", { x: r + 4, y: 4, text: f.name }));
-      g.dataset.id = f.id;
-      g.addEventListener("mouseenter", () => hoverFile(f.id));
-      g.addEventListener("mouseleave", () => hoverFile(null));
-      g.addEventListener("click", () => { if (!drag?.moved) select(f.id); });
-      gn.append(g); nodeEls.set(f.id, g);
-    }
-    function hoverFile(fid) {
-      const focus = fid || (state.sel && fileOf(state.sel)) || highlight;
-      svg.classList.toggle("dim", !!focus);
-      nodeEls.forEach((g) => g.classList.remove("hot"));
-      edgeEls.forEach((p) => p.classList.remove("hot"));
-      if (!focus) { pulses([]); return; }
-      const near = new Set([focus, ...get(out, focus), ...get(inn, focus)]);
-      near.forEach((id) => nodeEls.get(id)?.classList.add("hot"));
-      const hot = edgeEls.filter((p) => p.dataset.s === focus || p.dataset.t === focus);
-      hot.forEach((p) => p.classList.add("hot"));
-      pulses(hot);
-      $("#hint").textContent = `${files.get(focus).path} · imports ${get(out, focus).length} · imported by ${get(inn, focus).length}`;
-    }
-    const selFile = state.sel && fileOf(state.sel);
-    if (selFile) nodeEls.get(selFile)?.classList.add("selected");
-    hoverFile(null);
-    legend([["imports", "rgba(155,135,255,.7)", "import"], ["cycle", "var(--rose)", "import cycle"], ["dot", "", "size = lines · colour = package"]]);
-    return { pos, nodeEls };
+    buildSpace();
+    space.active = true; space.theme = null;
+    sizeSpace();
+    space.hover = null; setHover(null);
+    legend([["imports", "rgba(155,135,255,.7)", "import"], ["cycle", "var(--rose)", "import cycle"], ["dot", "", "size = lines · colour = package · drag to orbit"]]);
+    wake();
+  }
+  // a test and automation hook: what is lit when a file is hovered
+  function spaceProbe(id) {
+    setHover(id || null);
+    const F = focusSet(), hot = F ? space.links.filter((l) => l.a.id === F.id || l.b.id === F.id).length : 0;
+    return { nodes: space.nodes.length, lit: F ? F.near.size : 0, links: hot, settled: space.alpha === 0, drawn: space.nodes.filter((n) => n.ss).length, running: !!space.raf || reduced, yaw: space.yaw, dist: Math.round(space.dist), fit: Math.round(fitDist(spread(space.nodes, 0, 0, 0))), w: space.w, h: space.h };
   }
 
   // ------------------------------------------------------------------ flow: layered dependency map
@@ -546,7 +766,7 @@
     $("#tourDots").replaceChildren(...steps.map((_, k) => el("i", { class: k <= state.tour ? "on" : "" })));
     state.sel = s.sel || null;
     renderView(s.view, true);
-    if (s.pkg && constellation) { const c = constellation.centers.find((c) => c.id === s.pkg); if (c) fit(30, { x: c.x - c.r, y: c.y - c.r, width: c.r * 2, height: c.r * 2 }); }
+    if (s.pkg) spaceFocusPackage(s.pkg);
     const t = $("#tourText"); clearInterval(typeTimer);
     if (reduced) t.textContent = s.text; else { let k = 0; t.textContent = ""; typeTimer = setInterval(() => { t.textContent = s.text.slice(0, ++k); if (k >= s.text.length) clearInterval(typeTimer); }, 16); }
     clearTimeout(tourTimer);
@@ -558,7 +778,7 @@
 
   // ------------------------------------------------------------------ view switching
   const VIEWS = {
-    constellation: { icon: "✦", label: "Constellation", desc: "Every file, clustered by package. Hover to light up what it imports and what imports it.", draw: drawConstellation },
+    constellation: { icon: "✦", label: "Constellation", desc: "Every file as a body in 3D space: imports pull, files repel, packages cluster. Drag to orbit, hover to light up a file's imports.", draw: drawConstellation },
     flow: { icon: "⇶", label: "Flow", desc: "Dependencies left to right, from entry side to foundations. Cycles glow rose.", draw: drawFlow },
     impact: { icon: "◎", label: "Impact", desc: "Blast radius: what could break if the selected file or symbol changes.", draw: drawImpact },
     calls: { icon: "ƒ", label: "Calls", desc: "Who calls into the selected file, and what it calls (inferred from imports).", draw: drawCalls },
@@ -574,12 +794,14 @@
     markTabs(fromTour ? "tour" : id);
     $("#viewTitle").textContent = VIEWS[id].label;
     $("#viewDesc").textContent = VIEWS[id].desc;
-    const tm = id === "hotspots";
-    $("#treemap").hidden = !tm; svg.style.display = tm ? "none" : "block"; $("#zoomTools").hidden = tm;
+    const tm = id === "hotspots", s3 = id === "constellation";
+    if (!s3) { space.active = false; cancelAnimationFrame(space.raf); space.raf = 0; }
+    $("#treemap").hidden = !tm; cvs.hidden = !s3; svg.style.display = tm || s3 ? "none" : "block"; $("#zoomTools").hidden = tm;
     toolsFor(id);
     $("#hint").textContent = "";
     VIEWS[id].draw();
-    if (!tm) fit();
+    if (s3) { if (state.sel) spaceFocus(fileOf(state.sel)); else if (!space.moved) spaceFit(); }
+    else if (!tm) fit();
     inspect(state.sel);
     syncHash();
   }
@@ -624,7 +846,7 @@
         ...section("Most depended on", D.insights.most_depended.slice(0, 6).map((f) => link(f, `← ${files.get(f).fan_in}`))),
         ...section("Entry points", D.insights.entry_points.slice(0, 6).map((f) => link(f))),
         el("h3", { class: "eyebrow", text: "How to read this" }),
-        el("ul", { class: "muted" }, el("li", { text: "Circles are files; size is lines of code, colour is the package." }), el("li", { text: "Arrows point from a file to what it imports." }), el("li", { text: "Calls and inheritance are inferred statically by Ananke and may miss dynamic dispatch." })),
+        el("ul", { class: "muted" }, el("li", { text: "Each sphere is a file; size is lines of code, colour is the package." }), el("li", { text: "Lines join a file to what it imports. In the constellation, drag to orbit and scroll to zoom." }), el("li", { text: "Calls and inheritance are inferred statically by Ananke and may miss dynamic dispatch." })),
       );
       return;
     }
@@ -769,7 +991,7 @@
   }
   $("#about").addEventListener("click", (e) => { if (e.target.id === "about") $("#about").hidden = true; });
   $("#infoBtn").onclick = about;
-  function toggleTheme() { const r = document.documentElement; r.dataset.theme = r.dataset.theme === "day" ? "night" : "day"; syncHash(); }
+  function toggleTheme() { const r = document.documentElement; r.dataset.theme = r.dataset.theme === "day" ? "night" : "day"; space.theme = null; wake(); syncHash(); }
   $("#themeBtn").onclick = toggleTheme;
   function download(name, obj) {
     const a = el("a", { download: name, href: URL.createObjectURL(new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" })) });
@@ -813,10 +1035,10 @@
     else if (state.view === "tour" && e.key === "ArrowLeft") runTour(state.tour - 1);
   });
   let resizeTimer;
-  window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (state.view === "hotspots") drawHotspots(); else fit(); }, 150); });
+  window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (state.view === "hotspots") drawHotspots(); else if (space.active) { sizeSpace(); wake(); } else fit(); }, 150); });
 
   buildSidebar();
   renderView(state.view);
   if (state.sel) select(state.sel);
-  window.__devGuru = { state, D, M, renderView, select, find };
+  window.__devGuru = { state, D, M, renderView, select, find, space: spaceProbe };
 })();

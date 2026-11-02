@@ -18,11 +18,19 @@ export const site = {
     {
       "label": "GitHub",
       "href": "https://github.com/Neo-Pragnya/Dev-Guru"
+    },
+    {
+      "label": "PyPI",
+      "href": "https://pypi.org/project/dev-guru/"
     }
   ],
   "logoShapes": "blob star flower hex",
   "footer": "Dev Guru · Apache-2.0 · built on Ananke Plexus, with Dex Trove as optional capability memory.",
   "footerLinks": [
+    {
+      "label": "PyPI ↗",
+      "href": "https://pypi.org/project/dev-guru/"
+    },
     {
       "label": "GitHub ↗",
       "href": "https://github.com/Neo-Pragnya/Dev-Guru"
@@ -42,6 +50,10 @@ export const NAV: { label: string; href: string }[] = [
   {
     "label": "Dex Trove ↗",
     "href": "https://neo-pragnya.github.io/Dex-Trove/"
+  },
+  {
+    "label": "PyPI ↗",
+    "href": "https://pypi.org/project/dev-guru/"
   },
   {
     "label": "GitHub ↗",
@@ -73,6 +85,7 @@ export const DOC_NAV: { section: string; items: string[]; shapes: string; tint: 
     "section": "Concepts",
     "items": [
       "concepts/architecture",
+      "concepts/ananke-client",
       "concepts/report-safety"
     ],
     "shapes": "circle>flower",
@@ -86,23 +99,15 @@ export const DOC_NAV: { section: string; items: string[]; shapes: string; tint: 
     ],
     "shapes": "triangle>circle",
     "tint": "sky"
-  },
-  {
-    "section": "Decisions",
-    "items": [
-      "decisions/0001-ananke-client-port"
-    ],
-    "shapes": "squircle>spark",
-    "tint": "lilac"
   }
 ];
 
 /** Titles for docs without `title` frontmatter (from mkdocs.yml nav or the first heading). */
 export const DOC_TITLES: Record<string, string> = {
   "index": "Dev Guru",
+  "concepts/ananke-client": "How Dev Guru talks to Ananke",
   "concepts/architecture": "Architecture",
   "concepts/report-safety": "Report safety",
-  "decisions/0001-ananke-client-port": "ADR-0001: one Ananke client port, in-process first",
   "guides/explorer": "The explorer",
   "guides/getting-started": "Getting started",
   "guides/sdk": "Python SDK",
@@ -120,17 +125,10 @@ export const FEATURES: { title: string; text: string; href: string; shapes: stri
   },
   {
     "title": "Concepts",
-    "text": "Architecture · Report safety",
+    "text": "Architecture · How Dev Guru talks to Ananke · Report safety",
     "href": "docs/concepts/architecture/",
     "shapes": "circle>flower",
     "tint": "teal"
-  },
-  {
-    "title": "Decisions",
-    "text": "ADR-0001: one Ananke client port, in-process first",
-    "href": "docs/decisions/0001-ananke-client-port/",
-    "shapes": "squircle>spark",
-    "tint": "lilac"
   },
   {
     "title": "Guides",

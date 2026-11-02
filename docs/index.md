@@ -17,6 +17,8 @@ dev explore path/to/project -o explorer.html --open
 Everything is computed locally by [Ananke Plexus](https://neo-pragnya.github.io/Ananke-Plexus/), the engineering
 harness Dev Guru runs on. The report is one file: no server, no network, nothing to install to view it.
 
+Dev Guru is on PyPI as [`dev-guru`](https://pypi.org/project/dev-guru/).
+
 ## What you can do today
 
 | Command | What you get |

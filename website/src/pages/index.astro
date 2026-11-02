@@ -12,7 +12,7 @@ const titleOf = (id: string) =>
 const href = (h: string) => (/^https?:/.test(h) ? h : `${base}${h.replace(/^\//, "")}`);
 const demo = `${base}demo/dev-guru-explorer.html`;
 const views = [
-  { id: "constellation", q: "What's here?", title: "Constellation", text: "Every file as a point of light, clustered by package. Hover and its imports glow." },
+  { id: "constellation", q: "What's here?", title: "Constellation", text: "A 3D force-directed graph of every file: orbit it, pull a file, watch the imports glow." },
   { id: "flow", q: "What depends on what?", title: "Flow", text: "Entry side to foundations, by package or file. Cycles glow rose." },
   { id: "impact", q: "What breaks if this changes?", title: "Impact", text: "Blast-radius rings: importers and callers, hop by hop." },
   { id: "calls", q: "Who calls in, what goes out?", title: "Calls", text: "A symbol-level ego network around any file." },

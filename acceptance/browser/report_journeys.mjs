@@ -52,23 +52,30 @@ async function journey(name, fn) {
 const expect = (c, m) => { if (!c) throw new Error(m); };
 
 await viewport(1440, 900);
-await journey("the report opens offline and draws the constellation", async () => {
+await journey("the report opens offline and draws the 3D constellation", async () => {
   await go("", 1800);
-  const t = await evaluate(`({ files: window.__devGuru.D.files.length, nodes: document.querySelectorAll("#svg .node").length, title: document.title, foot: document.querySelector("#foot").innerText })`);
-  expect(t.nodes === t.files, `${t.nodes} nodes for ${t.files} files`);
+  const t = await evaluate(`({ files: window.__devGuru.D.files.length, probe: window.__devGuru.space(null), canvas: !document.querySelector("#space").hidden, title: document.title, foot: document.querySelector("#foot").innerText })`);
+  expect(t.canvas, "the 3D canvas is not shown");
+  expect(t.probe.nodes === t.files, `${t.probe.nodes} bodies for ${t.files} files`);
+  expect(t.files === 0 || t.probe.drawn > 0, "no file is in front of the camera");
   if (expectFiles !== null) expect(t.files === expectFiles, `report has ${t.files} files, expected ${expectFiles}`);
   expect(/offline · view-only/.test(t.foot), "footer missing the offline note");
   await shot("constellation");
-  return `${t.nodes} files`;
+  return `${t.probe.nodes} files, ${t.probe.drawn} in view, ${t.probe.settled ? "settled" : "still settling"}`;
 });
-await journey("hover lights up a file's neighbours and sends pulses along its imports", async () => {
-  const r = await evaluate(`(() => { const best = [...window.__devGuru.D.files].sort((a,b)=>(b.fan_in+b.fan_out)-(a.fan_in+a.fan_out))[0]; const g = document.querySelector('#svg .node[data-id="'+CSS.escape(best.id)+'"]'); g.dispatchEvent(new MouseEvent("mouseenter")); return { hot: document.querySelectorAll("#svg .node.hot").length, edges: document.querySelectorAll("#svg .edge.hot").length, dim: document.querySelector("#svg").classList.contains("dim"), links: best.fan_in + best.fan_out }; })()`);
-  await new Promise((r) => setTimeout(r, 300));
-  const pulses = await evaluate(`document.querySelectorAll("#svg .pulse").length`);
-  if (!r.links) return "no imports between files in this project: nothing to light up";
-  expect(r.dim && r.hot >= 2 && r.edges >= 1, JSON.stringify(r));
-  expect(pulses > 0, "no pulses travelling");
-  return `${r.hot} lit, ${r.edges} edges, ${pulses} pulses`;
+await journey("the 3D graph orbits, and hover lights up a file's neighbours", async () => {
+  const before = await evaluate(`(() => { const c = document.querySelector("#space"); return c.getContext("2d").getImageData(0, 0, c.width, c.height).data.reduce((a, v, i) => (i % 4 === 3 ? a + (v > 0) : a), 0); })()`);
+  expect(before > 500, `the canvas is nearly empty (${before} painted pixels)`);
+  const box = await evaluate(`(() => { const r = document.querySelector("#space").getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+  const yaw0 = await evaluate(`window.__devGuru.space(null).yaw`);
+  for (const [type, dx] of [["mousePressed", 0], ["mouseMoved", 40], ["mouseMoved", 120], ["mouseReleased", 120]]) await send("Input.dispatchMouseEvent", { type, x: box.x + dx + 200, y: box.y, button: "left", buttons: type === "mouseReleased" ? 0 : 1, clickCount: 1 });
+  const r = await evaluate(`(() => { const best = [...window.__devGuru.D.files].sort((a,b)=>(b.fan_in+b.fan_out)-(a.fan_in+a.fan_out))[0]; const p = window.__devGuru.space(best.id); return { ...p, links0: best.fan_in + best.fan_out, hint: document.querySelector("#hint").textContent }; })()`);
+  await shot("constellation-hover");
+  await evaluate(`window.__devGuru.space(null)`);
+  expect(Math.abs(r.yaw - yaw0) > 0.3, `dragging did not orbit the camera (yaw ${yaw0} → ${r.yaw})`);
+  if (!r.links0) return "no imports between files in this project: nothing to light up";
+  expect(r.lit >= 2 && r.links >= 1 && /imported by/.test(r.hint), JSON.stringify(r));
+  return `${before} px painted, ${r.lit} lit, ${r.links} links`;
 });
 await journey("search finds a symbol and the inspector shows its source as text", async () => {
   const sym = await evaluate(`(window.__devGuru.D.symbols.find(s => s.source && s.source.length > 20) || window.__devGuru.D.symbols[0]).name`);
