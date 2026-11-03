@@ -47,6 +47,7 @@ dev present talk.md                  # Markdown slides → one offline, accessib
 dev diagram docs/arch.md             # an animated SVG of what a document states, every edge cited
 dev explore . --profile public       # a report safe to publish: no source, docstrings or Git revision
 dev sources                          # capabilities from your folders, private Git and Dex Trove
+dev serve                            # a local, authenticated gateway to Ananke for browsers
 dev learning review NAME             # review what Ananke learned before it becomes reusable
 ```
 

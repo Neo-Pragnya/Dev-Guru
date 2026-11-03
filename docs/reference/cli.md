@@ -60,6 +60,15 @@ Writes a review page for a learning candidate: what still blocks promotion, the 
 review decision, provenance, and a diff against each destination. Reviewing changes nothing. Approve with
 `ananke learning review --approve`, then promote with `ananke learning promote`.
 
+## `dev serve`
+
+```bash
+dev serve [WORKSPACE]... [--port N] [--open/--no-open] [--transport NAME]
+```
+
+Starts [the local gateway](../guides/gateway.md) for the listed folders, or the current one. It listens on this computer
+only and prints a link that works once. Stop it with Ctrl-C. Exits `2` if a folder doesn't exist or the port is taken.
+
 ## `dev diagram`
 
 ```text

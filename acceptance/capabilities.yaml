@@ -17,6 +17,7 @@ capabilities:
   - { id: present, title: "dev present: offline, accessible decks; remote images and raw HTML refused", dimension: core, blocker: true }
   - { id: sources, title: "Source-neutral discovery; explore runs through the Ananke app facade and records the report; Dex-free", dimension: core, blocker: true }
   - { id: diagram, title: "dev diagram: cited SVG from documents; prose can't add edges; safe output", dimension: core, blocker: true }
+  - { id: gateway, title: "dev serve: loopback only, single-use login, origin and CSRF checks, scoped workspaces; a run reaches real Ananke", dimension: security, blocker: true }
   - { id: cli-ux, title: "Errors are clean, carry stable codes, and refusals exit non-zero", dimension: usability, blocker: false }
 
 # Every user-facing command.
@@ -27,4 +28,5 @@ surface:
   - dev present
   - dev diagram
   - dev sources
+  - dev serve
   - dev learning review

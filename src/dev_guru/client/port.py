@@ -9,7 +9,7 @@ silently swapped for another (docs/concepts/ananke-client.md).
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from pydantic import BaseModel, Field
 
@@ -124,6 +124,30 @@ class AnankeClient(Protocol):
     def discover_capabilities(self, workspace: Path, query: str = "") -> list[CapabilityInfo]: ...
 
     def learning_candidate(self, workspace: Path, name: str) -> LearningCandidate: ...
+
+    def harness_capabilities(self, workspace: Path) -> dict[str, Any]: ...
+
+    def code_view(self, workspace: Path, **filters: Any) -> dict[str, Any]: ...
+
+    def prepare_plan(self, workspace: Path, draft: dict[str, Any]) -> dict[str, Any]: ...
+
+    def submit_run(
+        self, workspace: Path, kind: str, parameters: dict[str, Any], idempotency_key: str
+    ) -> dict[str, Any]:
+        """Record a run without starting it. The same key and request return the same run."""
+        ...
+
+    def drive_run(self, workspace: Path, run_id: str) -> dict[str, Any]: ...
+
+    def get_run(self, workspace: Path, run_id: str) -> dict[str, Any]: ...
+
+    def run_events(self, workspace: Path, run_id: str, after: int = 0) -> dict[str, Any]: ...
+
+    def cancel_run(self, workspace: Path, run_id: str) -> dict[str, Any]: ...
+
+    def run_artifacts(self, workspace: Path, run_id: str) -> list[dict[str, Any]]: ...
+
+    def read_artifact(self, workspace: Path, run_id: str, name: str) -> bytes: ...
 
 
 __all__ = [
