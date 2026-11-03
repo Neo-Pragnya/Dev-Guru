@@ -23,7 +23,6 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from http.cookies import CookieError, SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from importlib import resources
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
@@ -253,7 +252,7 @@ class _Handler(BaseHTTPRequestHandler):
         self._check_origin(required=False)
         self._check_session()
         if url.path == "/":
-            page = resources.files("dev_guru.gateway").joinpath("static/index.html").read_bytes()
+            page = (Path(__file__).parent / "static" / "index.html").read_bytes()
             self._send(200, page, "text/html; charset=utf-8")
             return
         self._api_get(url.path, query)
