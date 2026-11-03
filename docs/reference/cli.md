@@ -39,6 +39,27 @@ Exit `0` on success. Exit `1` with a stable error code (`WORKSPACE_INVALID`, `HA
 be explored. An empty folder is an error, never an empty report. Set `SOURCE_DATE_EPOCH` for a reproducible
 `generated_at`.
 
+## `dev sources`
+
+```text
+dev sources [QUERY] [-w, --workspace DIR] [--html PICKER.html] [--json]
+```
+
+Lists the capabilities every source the project configures offers: approved folders and private Git repos
+(`[capability_sources]`) and enabled troves, through Ananke's provider port. Identities are
+`source:namespace/name`, with exact versions and digests. `--html` writes an offline picker with search and source
+filters.
+
+## `dev learning review`
+
+```text
+dev learning review NAME [-w DIR] [-o PAGE.html] [--open] [--json]
+```
+
+Writes a review page for a learning candidate: what still blocks promotion, the evaluation cases and results, the
+review decision, provenance, and a diff against each destination. Reviewing changes nothing. Approve with
+`ananke learning review --approve`, then promote with `ananke learning promote`.
+
 ## `dev present`
 
 ```text

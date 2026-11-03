@@ -10,6 +10,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
 
 ### Added
 
+- **Runs through the Ananke app facade** (`ananke-app/1`, needs Ananke 0.3.13):
+  - `dev explore` builds the graph in an idempotent Ananke run, records the run in the report manifest
+    (`ananke_run`), and registers the HTML back into that run as an artifact with its inputs;
+  - a failed build is a failed run, with its id kept as evidence.
+- **`dev sources`**: source-neutral capability discovery (internal folders, private Git, troves) with an offline
+  picker page. Works with Dex switched off.
+- **`dev learning review`**: an offline review page for an Ananke learning candidate, showing the gate status,
+  evaluation, review, provenance and a diff per destination.
+
 - **`dev present`**: Markdown slides become one offline, accessible HTML deck:
   - `lantern` and `paper` themes, responsive columns, step-by-step lists, speaker notes, keyboard navigation;
   - bar charts as accessible SVG;

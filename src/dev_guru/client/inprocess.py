@@ -4,10 +4,20 @@ from __future__ import annotations
 
 from collections import Counter
 from pathlib import Path
+from typing import Any
 
 import dev_guru.client.negotiation as negotiation
 from dev_guru import errors
-from dev_guru.client.port import GraphData, GraphEdgeData, GraphNodeData, GraphSummary, HarnessInfo
+from dev_guru.client.port import (
+    CapabilityInfo,
+    Destination,
+    GraphData,
+    GraphEdgeData,
+    GraphNodeData,
+    GraphSummary,
+    HarnessInfo,
+    LearningCandidate,
+)
 
 
 class InProcessAnanke:
@@ -60,27 +70,54 @@ class InProcessAnanke:
             )
         return info
 
-    def graph_data(self, workspace: Path) -> GraphData:
-        """Ask Ananke to build the workspace graph and return the snapshot it stored."""
-        info = self.require_compatible()
+    def _root(self, workspace: Path) -> Path:
         root = workspace.expanduser().resolve()
         if not root.is_dir():
             raise errors.GuruError(errors.WORKSPACE_INVALID, f"workspace {root} is not a directory")
-        from ananke.plexus.api import Ananke
-        from ananke.plexus.graph.service import load_graph
+        return root
 
-        result = Ananke.open(root).graph_build()
-        if not result.ok:
-            raise errors.GuruError(
-                errors.HARNESS_FAILED, f"Ananke could not build the graph: {result.summary}"
+    def _facade(self, root: Path):  # type: ignore[no-untyped-def]
+        """The Ananke app facade for a workspace, after protocol negotiation (never a silent downgrade)."""
+        from ananke.plexus.app import AppError, AppFacade
+
+        facade = AppFacade(root)
+        try:
+            facade.negotiate([negotiation.APP_PROTOCOL])
+        except AppError as exc:
+            raise errors.GuruError(errors.HARNESS_INCOMPATIBLE, exc.message) from exc
+        return facade
+
+    def graph_data(self, workspace: Path) -> GraphData:
+        """Run Ananke's graph build through the app facade and read the snapshot artifact it produced."""
+        info = self.require_compatible()
+        root = self._root(workspace)
+        from ananke.plexus.app import AppError
+        from ananke.plexus.graph.models import GraphSnapshot
+
+        facade = self._facade(root)
+        run_id = None
+        try:
+            prepared = facade.prepare_run("graph.build")
+            # the same workspace state is the same request: re-exploring unchanged code reuses the run
+            run = facade.submit_run(
+                prepared, "dev-guru-explore-" + prepared.locked_plan_digest[:24]
             )
-        snapshot = load_graph(root)
-        if (
-            snapshot is None
-        ):  # a "successful" build with nothing stored is a harness fault, not an empty graph
-            raise errors.GuruError(
-                errors.HARNESS_FAILED, "Ananke reported a graph build but stored no snapshot"
+            run_id = run["run_id"]
+            if run["state"] != "succeeded":
+                reasons = (
+                    "; ".join(str(w.get("message")) for w in run.get("warnings", []))
+                    or run["state"]
+                )
+                raise errors.GuruError(
+                    errors.HARNESS_FAILED,
+                    f"Ananke's graph run {run['state']}: {reasons}",
+                    run_id=run_id,
+                )
+            snapshot = GraphSnapshot.model_validate_json(
+                facade.read_artifact(run_id, "graph-snapshot.json")
             )
+        except AppError as exc:
+            raise errors.GuruError(errors.HARNESS_FAILED, exc.message, run_id=run_id) from exc
         return GraphData(
             snapshot_id=snapshot.snapshot_id,
             provider=snapshot.provider,
@@ -102,7 +139,125 @@ class InProcessAnanke:
                 )
                 for e in snapshot.edges
             ],
-            source=str(result.details.get("path", "")),
+            source=f"ananke run {run_id}",
+            run_id=run_id,
+        )
+
+    def register_artifact(
+        self,
+        workspace: Path,
+        run_id: str,
+        name: str,
+        data: bytes,
+        *,
+        media_type: str,
+        input_refs: list[str],
+    ) -> dict[str, object]:
+        """Record a rendered report in the Ananke run it came from (Dev Guru is the external renderer)."""
+        from ananke.plexus.app import AppError
+
+        try:
+            ref: dict[str, object] = self._facade(self._root(workspace)).register_artifact(
+                run_id,
+                name,
+                data,
+                media_type=media_type,
+                producer="dev-guru/explorer-html@1",
+                input_refs=input_refs,
+            )
+        except AppError as exc:
+            raise errors.GuruError(errors.HARNESS_FAILED, exc.message, run_id=run_id) from exc
+        return ref
+
+    def discover_capabilities(self, workspace: Path, query: str = "") -> list[CapabilityInfo]:
+        """Capabilities from every configured source, through Ananke's provider port."""
+        self.require_compatible()
+        from ananke.plexus.registry.providers import SourceError, from_project
+
+        try:
+            found = from_project(self._root(workspace)).discover(query, 100000)
+        except SourceError as exc:
+            raise errors.GuruError(errors.HARNESS_FAILED, exc.message) from exc
+        return [
+            CapabilityInfo(
+                identity=d.identity,
+                kind=d.kind,
+                version=d.version,
+                digest=d.digest,
+                summary=d.summary,
+                licence=d.licence,
+                unknown=list(d.unknown),
+            )
+            for d in found
+        ]
+
+    def learning_candidate(self, workspace: Path, name: str) -> LearningCandidate:
+        """Ananke's view of a learning candidate, and a diff against each writable destination."""
+        import difflib
+        import json
+
+        self.require_compatible()
+        from ananke.plexus.learning import candidates_dir, gate
+        from ananke.plexus.registry.providers import CapabilityRef, SourceError, from_project
+
+        root = self._root(workspace)
+        folder = candidates_dir(root) / name
+        if not folder.is_dir():
+            raise errors.GuruError(
+                errors.INVALID_INPUT,
+                f"no learning candidate {name!r}",
+                hint="list them with `ananke learning list`",
+            )
+
+        def read(file: str) -> Any:
+            path = folder / file
+            return json.loads(path.read_text()) if path.is_file() else None
+
+        evaluation, review, provenance = (
+            read("evaluation.json") or {},
+            read("review.json"),
+            read("provenance.json") or {},
+        )
+        skill = (folder / "SKILL.md").read_text(encoding="utf-8")
+        destinations = []
+        try:
+            providers = from_project(root)
+        except SourceError as exc:
+            raise errors.GuruError(errors.HARNESS_FAILED, exc.message) from exc
+        for sid, p in providers.providers.items():
+            dest = Destination(
+                source=sid,
+                writable=bool(p.writable),
+                visibility=str(getattr(p, "visibility", "internal")),
+            )
+            try:
+                current = p.resolve(CapabilityRef(name))
+                old = p.fetch(current).files.get("SKILL.md", b"").decode("utf-8", "replace")
+                dest.existing_version = current.version
+                dest.diff = "".join(
+                    difflib.unified_diff(
+                        old.splitlines(True),
+                        skill.splitlines(True),
+                        f"{sid}:{name}@{current.version}",
+                        f"candidate:{name}",
+                    )
+                )
+            except SourceError:
+                dest.diff = "".join(
+                    difflib.unified_diff(
+                        [], skill.splitlines(True), "/dev/null", f"candidate:{name}"
+                    )
+                )
+            destinations.append(dest)
+        return LearningCandidate(
+            name=name,
+            skill_md=skill,
+            cases=list(evaluation.get("cases", [])),
+            evaluated_at=evaluation.get("finished_at"),
+            review=review,
+            provenance=provenance,
+            problems=gate(folder),
+            destinations=destinations,
         )
 
     def graph_summary(self, workspace: Path) -> GraphSummary:
