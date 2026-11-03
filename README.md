@@ -40,6 +40,16 @@ Plus search (`/`), a command palette (`Ctrl`/`⌘` `K`), a source inspector, a l
 URLs. Reports are **offline and view-only**, treat source as text, and carry a manifest with the input digest and the
 Git revision. See [report safety](docs/concepts/report-safety.md).
 
+## More than the explorer
+
+```bash
+dev present talk.md                  # Markdown slides → one offline, accessible HTML deck
+dev diagram docs/arch.md             # an animated SVG of what a document states, every edge cited
+dev explore . --profile public       # a report safe to publish: no source, docstrings or Git revision
+dev sources                          # capabilities from your folders, private Git and Dex Trove
+dev learning review NAME             # review what Ananke learned before it becomes reusable
+```
+
 ## From Python
 
 ```python

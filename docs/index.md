@@ -24,6 +24,10 @@ Dev Guru is on PyPI as [`dev-guru`](https://pypi.org/project/dev-guru/).
 | Command | What you get |
 | --- | --- |
 | `dev explore` | The explorer report: constellation, flow, impact rings, calls, hotspots and a tour |
+| `dev present` | One offline, accessible HTML deck from Markdown slides |
+| `dev diagram` | An animated SVG of what a document states, every edge cited |
+| `dev sources` | Capabilities from your folders, private Git and Dex Trove |
+| `dev learning review` | A review page for what Ananke learned, before it becomes reusable |
 | `dev doctor` | Checks that a compatible Ananke is installed and has what Dev Guru needs |
 | `GuruClient(...).explore()` | The same, from Python |
 

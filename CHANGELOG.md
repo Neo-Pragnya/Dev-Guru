@@ -8,6 +8,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
 
 ## [Unreleased]
 
+---
+
+## [0.2.0] — 2026-11-03
+
 ### Added
 
 - **Runs through the Ananke app facade** (`ananke-app/1`, needs Ananke 0.3.13):
@@ -19,6 +23,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
 - **`dev learning review`**: an offline review page for an Ananke learning candidate, showing the gate status,
   evaluation, review, provenance and a diff per destination.
 
+- **`dev diagram`**: an animated SVG of the relationships a document states (arrow lines, Mermaid flowcharts, From/To
+  tables). Every edge cites its file and line, and an edited edge that fails its citation is drawn as a hypothesis.
+  Guide: [Diagrams from documents](docs/guides/diagrams.md).
 - **`dev present`**: Markdown slides become one offline, accessible HTML deck:
   - `lantern` and `paper` themes, responsive columns, step-by-step lists, speaker notes, keyboard navigation;
   - bar charts as accessible SVG;

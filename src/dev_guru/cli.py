@@ -284,3 +284,64 @@ def learning_review(
         console.print(f"{name}: {state} → {out}")
     if open_browser:
         webbrowser.open(out.resolve().as_uri())
+
+
+@app.command()
+def diagram(
+    document: Annotated[Path, typer.Argument(help="An approved Markdown document")],
+    output: Annotated[
+        Path | None, typer.Option("--output", "-o", help="SVG file (default <document>.svg)")
+    ] = None,
+    model_out: Annotated[
+        Path | None, typer.Option("--model", help="Also write the editable model (JSON)")
+    ] = None,
+    from_model: Annotated[
+        Path | None, typer.Option("--from-model", help="Render an edited model instead")
+    ] = None,
+    static: Annotated[bool, typer.Option("--static", help="No animation")] = False,
+    as_json: JsonOpt = False,
+) -> None:
+    """An animated SVG of the relationships a document states, every one cited (file and line).
+
+    Reads arrow lines (A -> B: label), Mermaid flowcharts and From/To tables, never prose, so nothing is invented.
+    Edited relationships whose citation doesn't hold up are drawn as hypotheses (dashed, "?").
+    """
+    from dev_guru import diagram as dg
+
+    try:
+        text = document.read_text(encoding="utf-8")
+        model = (
+            json.loads(from_model.read_text(encoding="utf-8"))
+            if from_model
+            else dg.extract(text, document.name)
+        )
+        model = dg.verify(model, text)
+    except (dg.DiagramError, OSError, ValueError) as exc:
+        err.print(f"[red]✗ {escape(str(exc))}[/red]")
+        raise typer.Exit(2) from exc
+    svg = dg.render(model, animate=not static)
+    problems = dg.svg_problems(svg)
+    if problems:  # never write an unsafe SVG, whatever the input
+        err.print("[red]✗ " + "; ".join(problems) + "[/red]")
+        raise typer.Exit(1)
+    out = output or document.with_suffix(".svg")
+    out.write_text(svg, encoding="utf-8")
+    if model_out:
+        model_out.write_text(
+            json.dumps(model, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+    hyp = sum(1 for r in model["relations"] if r["status"] != "cited")
+    summary = {
+        "svg": str(out),
+        "entities": len(model["entities"]),
+        "relations": len(model["relations"]),
+        "hypotheses": hyp,
+    }
+    if as_json:
+        console.print_json(json.dumps(summary))
+    else:
+        console.print(
+            f"[green]✓[/green] {len(model['relations']) - hyp} cited relationships, {summary['entities']} entities"
+            + (f", [yellow]{hyp} hypotheses[/yellow]" if hyp else "")
+            + f" → {out}"
+        )

@@ -60,6 +60,16 @@ Writes a review page for a learning candidate: what still blocks promotion, the 
 review decision, provenance, and a diff against each destination. Reviewing changes nothing. Approve with
 `ananke learning review --approve`, then promote with `ananke learning promote`.
 
+## `dev diagram`
+
+```text
+dev diagram DOCUMENT.md [-o, --output FILE] [--model FILE] [--from-model FILE] [--static] [--json]
+```
+
+An animated SVG of the relationships a document states, each cited by file and line. See
+[Diagrams from documents](../guides/diagrams.md). Exit `2` when the document has no explicit relationships or a file is
+missing or malformed.
+
 ## `dev present`
 
 ```text
