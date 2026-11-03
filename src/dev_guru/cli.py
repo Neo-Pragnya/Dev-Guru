@@ -287,6 +287,43 @@ def learning_review(
 
 
 @app.command()
+def serve(
+    workspaces: Annotated[
+        list[Path] | None, typer.Argument(help="Projects the browser may reach (default: here)")
+    ] = None,
+    port: Annotated[int, typer.Option(help="Local port (default: any free one)")] = 0,
+    open_browser: Annotated[bool, typer.Option("--open/--no-open", help="Open the browser")] = True,
+    transport: TransportOpt = "in-process",
+) -> None:
+    """Start the local web gateway. It only listens on this computer, and only the printed link gets in."""
+    from dev_guru.gateway import Gateway
+
+    try:
+        client = connect(transport)
+        client.require_compatible()  # type: ignore[attr-defined]
+        gateway = Gateway(workspaces or [Path.cwd()], client, port=port)
+    except errors.GuruError as exc:
+        _fail(exc, False, 2)
+    except OSError as exc:
+        _fail(
+            errors.GuruError(errors.INVALID_INPUT, f"can't listen on port {port}: {exc}"), False, 2
+        )
+    # printed plainly: rich would wrap a long link, and this link is the way in
+    print(
+        f"Dev Guru is listening on this computer only. Open this link, which works once:\n{gateway.login_url}",
+        flush=True,
+    )
+    if open_browser:
+        webbrowser.open(gateway.login_url)
+    try:
+        gateway.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        gateway.shutdown()
+
+
+@app.command()
 def diagram(
     document: Annotated[Path, typer.Argument(help="An approved Markdown document")],
     output: Annotated[

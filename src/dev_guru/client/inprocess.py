@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -86,6 +87,55 @@ class InProcessAnanke:
         except AppError as exc:
             raise errors.GuruError(errors.HARNESS_INCOMPATIBLE, exc.message) from exc
         return facade
+
+    def _call(self, workspace: Path, work: Callable[[Any], Any]) -> Any:
+        """Run one facade call, turning what Ananke refuses into a typed error that keeps its code."""
+        from ananke.plexus.app import AppError
+
+        facade = self._facade(self._root(workspace))
+        try:
+            return work(facade)
+        except AppError as exc:
+            raise errors.HarnessRefused(exc.code, exc.message, retryable=exc.retryable) from exc
+
+    def harness_capabilities(self, workspace: Path) -> dict[str, Any]:
+        return dict(self._call(workspace, lambda f: f.capabilities()))
+
+    def code_view(self, workspace: Path, **filters: Any) -> dict[str, Any]:
+        return dict(self._call(workspace, lambda f: f.code_view(**filters)))
+
+    def prepare_plan(self, workspace: Path, draft: dict[str, Any]) -> dict[str, Any]:
+        return dict(self._call(workspace, lambda f: f.preview_workflow(draft)))
+
+    def submit_run(
+        self, workspace: Path, kind: str, parameters: dict[str, Any], idempotency_key: str
+    ) -> dict[str, Any]:
+        return dict(
+            self._call(
+                workspace,
+                lambda f: f.submit_run(
+                    f.prepare_run(kind, parameters), idempotency_key, start=False
+                ),
+            )
+        )
+
+    def drive_run(self, workspace: Path, run_id: str) -> dict[str, Any]:
+        return dict(self._call(workspace, lambda f: f.drive(run_id)))
+
+    def get_run(self, workspace: Path, run_id: str) -> dict[str, Any]:
+        return dict(self._call(workspace, lambda f: f.get_run(run_id)))
+
+    def run_events(self, workspace: Path, run_id: str, after: int = 0) -> dict[str, Any]:
+        return dict(self._call(workspace, lambda f: f.stream_events(run_id, after)))
+
+    def cancel_run(self, workspace: Path, run_id: str) -> dict[str, Any]:
+        return dict(self._call(workspace, lambda f: f.cancel_run(run_id)))
+
+    def run_artifacts(self, workspace: Path, run_id: str) -> list[dict[str, Any]]:
+        return list(self._call(workspace, lambda f: f.list_artifacts(run_id)))
+
+    def read_artifact(self, workspace: Path, run_id: str, name: str) -> bytes:
+        return bytes(self._call(workspace, lambda f: f.read_artifact(run_id, name)))
 
     def graph_data(self, workspace: Path) -> GraphData:
         """Run Ananke's graph build through the app facade and read the snapshot artifact it produced."""

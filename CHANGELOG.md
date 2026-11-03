@@ -10,6 +10,22 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
 
 ---
 
+## [0.3.0] — 2026-11-03
+
+### Added
+
+- **`dev serve`, a local gateway to Ananke.** It listens on loopback only. A single-use link signs in one browser, and
+  changes also need a same-origin `Origin`, a CSRF token and a JSON body. Workspaces are named by opaque id, and no route
+  takes a command or path to run. It starts and cancels runs, reads events and artifacts, previews workflows and serves
+  the code graph. There's no web interface yet. Guide: [The local gateway](docs/guides/gateway.md).
+- The client port gains run, event, artifact, plan and code graph operations, so the gateway reaches Ananke only through it.
+
+### Changed
+
+- Needs Ananke 0.3.17 or newer, for its facade that's safe across threads.
+
+---
+
 ## [0.2.0] — 2026-11-03
 
 ### Added

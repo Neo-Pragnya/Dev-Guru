@@ -11,10 +11,8 @@ import importlib
 import re
 from importlib import metadata
 
-SUPPORTED_ANANKE = ">=0.3.13,<0.4"  # keep in step with pyproject.toml (tests/test_packaging.py)
-_MIN = (0, 3, 13)
+SUPPORTED_ANANKE = ">=0.3.17,<0.4"  # keep in step with pyproject.toml (tests/test_packaging.py)
 APP_PROTOCOL = "ananke-app/1"  # the app facade protocol this Dev Guru speaks
-_BELOW = (0, 4, 0)
 
 # Capability id -> (module, attribute path). Required ones are what this release of Dev Guru calls.
 CAPABILITIES: dict[str, tuple[str, str]] = {
@@ -34,6 +32,12 @@ REQUIRED = ("graph.build", "graph.load", "app.facade")
 def parse_version(text: str) -> tuple[int, int, int] | None:
     m = re.match(r"^(\d+)\.(\d+)\.(\d+)", text.strip())
     return (int(m.group(1)), int(m.group(2)), int(m.group(3))) if m else None
+
+
+_MIN, _BELOW = (
+    tuple(int(part) for part in bound.split("."))
+    for bound in re.fullmatch(r">=([\d.]+),<([\d.]+)", SUPPORTED_ANANKE).groups()  # type: ignore[union-attr]
+)
 
 
 def supported(version: str) -> bool:

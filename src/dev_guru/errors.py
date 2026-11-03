@@ -10,6 +10,7 @@ UNSUPPORTED_TRANSPORT = "UNSUPPORTED_TRANSPORT"
 WORKSPACE_INVALID = "WORKSPACE_INVALID"
 HARNESS_FAILED = "HARNESS_FAILED"
 INVALID_INPUT = "INVALID_INPUT"
+HARNESS_REFUSED = "HARNESS_REFUSED"
 CODES = frozenset(
     {
         HARNESS_MISSING,
@@ -19,6 +20,7 @@ CODES = frozenset(
         WORKSPACE_INVALID,
         HARNESS_FAILED,
         INVALID_INPUT,
+        HARNESS_REFUSED,
     }
 )
 
@@ -44,3 +46,12 @@ class GuruError(Exception):
             "hint": self.hint,
             "run_id": self.run_id,
         }
+
+
+class HarnessRefused(GuruError):
+    """Ananke refused a request. ``harness_code`` is its own stable code, kept so a client can branch on it."""
+
+    def __init__(self, harness_code: str, message: str, *, retryable: bool = False) -> None:
+        super().__init__(HARNESS_REFUSED, message)
+        self.harness_code = harness_code
+        self.retryable = retryable
