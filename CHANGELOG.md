@@ -29,6 +29,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
 - Needs Ananke 0.3.19 or newer, for its fixes to path traversal and vulnerable dependencies.
 - CI grants `security-events: write` only to the jobs that upload findings.
 - Releases are created with `gh release` rather than a third-party action.
+- CI installs Trivy with retries and a pinned SHA-256 rather than through a third-party action, so one failed DNS lookup can't block a release.
 
 ### Fixed
 
