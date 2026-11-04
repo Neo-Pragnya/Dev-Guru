@@ -64,7 +64,7 @@ const origin = new URL(login).origin;
 chrome = spawn(CHROME, ["--headless=new", "--remote-debugging-port=0", `--user-data-dir=${profile}`, "--no-first-run", "--no-default-browser-check", "--use-mock-keychain", "--password-store=basic", "--disable-gpu", "about:blank"], { stdio: "ignore" });
 setTimeout(() => { console.log("✗ journeys timed out"); quit(1); }, Number(process.env.JOURNEY_TIMEOUT_MS || 240000));
 let target;
-for (let i = 0; i < 200 && !target; i++) {
+for (let i = 0; i < 600 && !target; i++) { // a busy machine can take a while to start Chrome
   await sleep(150);
   try {
     const port = readFileSync(join(profile, "DevToolsActivePort"), "utf8").split("\n")[0];
@@ -130,6 +130,12 @@ const startRuns = (n) => evaluate(`(async () => {
 })()`);
 const runOf = (runId) => evaluate(`(async () => { const w = (await (await fetch("/api/v1/workspaces")).json()).workspaces[0].id; return await (await fetch("/api/v1/runs/${runId}?workspace=" + w)).json(); })()`);
 const eventTypes = `[...document.querySelectorAll("#events li")].map((l) => l.textContent)`;
+// The page fetches state, then events, then artifacts: wait for the last of them before reading any.
+const finished = async (runStateName, what, ms = 120000) => {
+  await until(`${runState} === "${runStateName}"`, what, ms);
+  await until(`${eventTypes}.at(-1)?.startsWith("run.${runStateName}")`, `${what}: the final event`);
+  await until(`document.querySelector("#artifacts a") || document.querySelector("#artifacts")?.textContent.includes("produced none")`, `${what}: the artifacts`);
+};
 const drain = (ids) => until(`(async () => { const w = (await (await fetch("/api/v1/workspaces")).json()).workspaces[0].id; for (const id of ${JSON.stringify(ids)}) { const r = await (await fetch("/api/v1/runs/" + id + "?workspace=" + w)).json(); if (r.state === "queued" || r.state === "running") return false; } return true; })()`, "the runs to finish", 120000);
 
 await viewport(1440, 900);
@@ -209,8 +215,8 @@ await journey("with no graph yet, Code says so and offers to build it; the run i
   await evaluate(`document.querySelector("#build-graph").click()`);
   await until(`location.hash.startsWith("#/runs/run-")`, "the run page");
   await ready();
-  await until(`${runState} === "succeeded"`, "the run to finish", 120000);
-  await until(`${eventTypes}.at(-1)?.startsWith("run.succeeded")`, "the final event in the timeline");
+  await finished("succeeded", "the run to finish", 120000);
+  await until(`document.querySelector("#artifacts a")`, "the run's artifact");
   const r = await evaluate(`({ events: ${eventTypes}, artifact: document.querySelector("#artifacts a")?.textContent, cancel: document.querySelector("#cancel").hidden })`);
   expect(r.events[0].startsWith("run.queued") && r.events.at(-1).startsWith("run.succeeded"), r.events.join(" | "));
   expect(r.artifact === "graph-snapshot.json", `artifact: ${r.artifact}`);
@@ -223,7 +229,7 @@ await journey("reloading the tab returns to the same run", async () => {
   await reload();
   const r = await evaluate(`({ hash: location.hash, id: document.querySelector("#run-id")?.textContent, events: document.querySelectorAll("#events li").length })`);
   expect(r.hash === before && before.endsWith(r.id), JSON.stringify(r));
-  await until(`${runState} === "succeeded"`, "the state after reload", 15000);
+  await finished("succeeded", "the state after reload", 15000);
   expect(r.events > 0, "no events after reload");
 });
 await journey("reloading while a run is going keeps the run, with no event shown twice", async () => {
@@ -233,7 +239,7 @@ await journey("reloading while a run is going keeps the run, with no event shown
   expect(state === "queued" || state === "running", `the run was already ${state}, so this proved nothing`);
   await reload();
   expect((await text("#run-id")) === runId, "the reload lost the run");
-  await until(`${runState} === "succeeded"`, "the run after reload", 120000);
+  await finished("succeeded", "the run after reload", 120000);
   const seen = await evaluate(eventTypes);
   const queued = seen.filter((e) => e.startsWith("run.queued")).length;
   const done = seen.filter((e) => e.startsWith("run.succeeded")).length;
@@ -246,7 +252,7 @@ await journey("leaving a run's page and coming back doesn't touch the run", asyn
   await route("#/runs");
   expect((await text("#main")).includes(runId), "the history doesn't list the run");
   await route(`#/runs/${runId}`);
-  await until(`${runState} === "succeeded"`, "the run", 120000);
+  await finished("succeeded", "the run", 120000);
   const seen = await evaluate(eventTypes);
   expect(!seen.some((e) => e.startsWith("run.cancelled")), seen.join(" | "));
 });
@@ -258,13 +264,13 @@ await journey("an artifact downloads, and can't run as a page on this origin", a
 await journey("events the harness no longer keeps are named as a gap, and the run still shows", async () => {
   const [runId] = await startRuns(1);
   await route(`#/runs/${runId}`);
-  await until(`${runState} === "succeeded"`, "the run", 120000);
+  await finished("succeeded", "the run", 120000);
   // what event retention does: drop the oldest events from the run's record
   const log = join(workspace, ".ananke", "app", "runs", runId, "events.jsonl");
   const lines = readFileSync(log, "utf8").split("\n").filter(Boolean);
   writeFileSync(log, lines.slice(2).join("\n") + "\n");
   await reload();
-  await until(`${runState} === "succeeded"`, "the run after reload", 15000);
+  await finished("succeeded", "the run after reload", 15000);
   const seen = await evaluate(eventTypes);
   expect(seen[0].includes("Events 1 to 2 are no longer kept"), seen.join(" | "));
   expect(seen.at(-1).startsWith("run.succeeded"), seen.join(" | "));
@@ -302,7 +308,8 @@ await journey("losing the connection shows it, and the view catches up without r
   await until(`document.querySelector("#banner").textContent.includes("Connection lost")`, "the lost-connection note", 15000);
   await shot("offline");
   await send("Network.emulateNetworkConditions", { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
-  await until(`${runState} === "succeeded" && document.querySelector("#banner").hidden`, "the run after reconnecting, with the note gone", 120000);
+  await finished("succeeded", "the run after reconnecting");
+  await until(`document.querySelector("#banner").hidden`, "the banner to clear");
   expectOffline = false;
   const r = await evaluate(`({ queued: [...document.querySelectorAll("#events li")].filter(l => l.textContent.startsWith("run.queued")).length, last: document.querySelector("#events li:last-child").textContent })`);
   expect(r.queued === 1 && r.last.startsWith("run.succeeded"), JSON.stringify(r));
@@ -316,7 +323,7 @@ await journey("cancel is one explicit button, and a cancelled run stays cancelle
   expect(!(await evaluate(`document.querySelector("#cancel").hidden`)), "no cancel button on a queued run");
   expect((await evaluate(runState)) === "queued", `the run was ${await evaluate(runState)}, so this proved nothing`);
   await evaluate(`document.querySelector("#cancel").click()`);
-  await until(`${runState} === "cancelled"`, "the cancelled state", 15000);
+  await finished("cancelled", "the cancelled state", 15000);
   await shot("cancelled");
   await drain(ids);
   expect((await runOf(last)).state === "cancelled", `the run ended ${(await runOf(last)).state}`);
@@ -329,7 +336,7 @@ await journey("a run that's already going can be cancelled, and doesn't then cla
   await route(`#/runs/${ids[0]}`);
   await until(`${runState} === "running"`, "the run to start", 60000);
   await evaluate(`document.querySelector("#cancel").click()`);
-  await until(`${runState} === "cancelled"`, "the cancelled state", 15000);
+  await finished("cancelled", "the cancelled state", 15000);
   await sleep(6000); // the build finishes behind the cancellation
   const after = await runOf(ids[0]);
   expect(after.state === "cancelled", `the run ended ${after.state}`);
