@@ -44,6 +44,10 @@ export const NAV: { label: string; href: string }[] = [
     "href": "docs/"
   },
   {
+    "label": "Roadmap ↗",
+    "href": "https://github.com/Neo-Pragnya/Dev-Guru/blob/main/ROADMAP.md"
+  },
+  {
     "label": "Ananke Plexus ↗",
     "href": "https://neo-pragnya.github.io/Ananke-Plexus/"
   },

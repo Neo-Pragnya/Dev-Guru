@@ -66,8 +66,8 @@ review decision, provenance, and a diff against each destination. Reviewing chan
 dev serve [WORKSPACE]... [--port N] [--open/--no-open] [--transport NAME]
 ```
 
-Starts [the local gateway](../guides/gateway.md) for the listed folders, or the current one. It listens on this computer
-only and prints a link that works once. Stop it with Ctrl-C. Exits `2` if a folder doesn't exist or the port is taken.
+Starts [the local gateway and its web interface](../guides/gateway.md) for the listed folders, or the current one. It
+listens on this computer only and prints a link that works once. Stop it with Ctrl-C. Exits `2` if a folder doesn't exist or the port is taken.
 
 ## `dev diagram`
 

@@ -21,6 +21,9 @@ import os
 import re
 import subprocess
 from datetime import UTC, datetime
+
+# False positive: this package needs Python 3.11 or newer (requires-python), where importlib.resources always exists.
+# nosemgrep: python.lang.compatibility.python37.python37-compatibility-importlib2
 from importlib import resources
 from pathlib import Path
 from typing import Any

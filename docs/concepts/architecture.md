@@ -1,7 +1,7 @@
 # Architecture
 
 Dev Guru is the product layer of a three-repository system. It turns Ananke's analysis into developer experiences:
-commands, an SDK, reports and, later, a local web UI.
+commands, an SDK, reports and a local web interface.
 
 ```mermaid
 flowchart TD
@@ -28,7 +28,7 @@ flowchart TD
 
 - `connect(transport)` returns an `AnankeClient` for exactly one transport. Today that's `in-process`, which calls
   the installed `ananke-plexus` package through its public facade. Planned: `process` (an isolated, versioned Ananke
-  executable over structured JSON) and `gateway` (the authenticated loopback API of the later web app).
+  executable over structured JSON) and `gateway` (the authenticated loopback API behind the web interface).
 - `info()` negotiates: the installed version against `SUPPORTED_ANANKE`, plus a probe of each capability Dev Guru
   calls. Required capabilities missing, or a version out of range, is an error with a stable code.
 - `graph_data(workspace)` runs Ananke's `graph.build` through the **app facade** (protocol `ananke-app/1`): the

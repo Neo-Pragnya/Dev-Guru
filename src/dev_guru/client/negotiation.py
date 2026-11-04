@@ -11,7 +11,7 @@ import importlib
 import re
 from importlib import metadata
 
-SUPPORTED_ANANKE = ">=0.3.17,<0.4"  # keep in step with pyproject.toml (tests/test_packaging.py)
+SUPPORTED_ANANKE = ">=0.3.19,<0.4"  # keep in step with pyproject.toml (tests/test_packaging.py)
 APP_PROTOCOL = "ananke-app/1"  # the app facade protocol this Dev Guru speaks
 
 # Capability id -> (module, attribute path). Required ones are what this release of Dev Guru calls.
@@ -57,6 +57,8 @@ def probe(capabilities: dict[str, tuple[str, str]] = CAPABILITIES) -> dict[str, 
     found: dict[str, bool] = {}
     for cap, (module, attr_path) in capabilities.items():
         try:
+            # False positive: module names come from the fixed CAPABILITIES table above, never from a request or a file.
+            # nosemgrep: python.lang.security.audit.non-literal-import.non-literal-import
             obj: object = importlib.import_module(module)
             for part in attr_path.split("."):
                 obj = getattr(obj, part)

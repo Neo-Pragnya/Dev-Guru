@@ -1,12 +1,12 @@
 ---
 title: The local gateway
-description: What dev serve does, how it decides who gets in, its API, and what it doesn't do yet.
+description: What dev serve does, what its web interface shows, how it decides who gets in, its API, and its limits.
 ---
 
 # The local gateway
 
-`dev serve` starts a small web server on your computer, so a browser can reach Ananke through Dev Guru. It's the base for
-the web interface. **There's no web interface in this version yet:** the page it serves says so, and you use the API.
+`dev serve` starts a small web server on your computer and opens a web interface to what Ananke computes. It comes with
+[Dev Guru on PyPI](https://pypi.org/project/dev-guru/) and needs no Node: the page is plain files inside the package.
 
 ```bash
 dev serve                     # this folder
@@ -25,6 +25,44 @@ flowchart LR
 
 The gateway holds no domain logic. Ananke compiles, authorizes, runs and records, and it rechecks everything itself.
 
+## The web interface
+
+| Page | What you can do |
+| --- | --- |
+| **Overview** | See the Ananke version, the Dev Guru version, the run count and what the harness can run |
+| **Runs** | Build the code graph, and see this workspace's runs, newest first |
+| **A run** | Follow its state, events, warnings and artifacts as they happen, download artifacts, and cancel it |
+| **Code** | Browse the code graph by folder, file or symbol, within a node budget, and see where every link went |
+| **Capabilities** | Search what your sources offer. Being listed doesn't mean a capability is trusted or will run |
+
+If you started `dev serve` with several folders, the picker at the top chooses between them.
+
+**Workflows**, **Quality**, **Documentation** and **Learning review** aren't in this version. They're in the navigation
+under that heading, and each names the commands that work today. See the
+[roadmap](https://github.com/Neo-Pragnya/Dev-Guru/blob/main/ROADMAP.md) for what's planned.
+
+### Runs keep going without the page
+
+A run lives in Ananke, not in your tab:
+
+- **Reload or close the tab**, and opening the run's address again shows the same run, with each event once.
+- **Lose the connection**, and a note says so while the page retries. When it's back, the page picks up after the last
+  event it saw. If Ananke has dropped old events by then, the list says which ones.
+- **Cancel** is one button, and nothing else cancels a run: not leaving the page, closing the tab or losing the
+  connection. A cancelled run stays cancelled, even if the work behind it was already finishing.
+
+### Keyboard and small screens
+
+The first `Tab` reaches a skip link to the content, every control works from the keyboard, focus is always visible, and
+moving to a page puts focus on it. Every page fits a phone without sideways scrolling. The theme switch is remembered in
+that browser.
+
+### Hostile text stays text
+
+File names, messages and anything else from the server reach the page only as text, so a file called
+`<img src=x onerror=alert(1)>.py` is displayed and does nothing. Links are built only from fixed starting points. The
+page loads nothing from any other site, and the content policy allows no inline code.
+
 ## Why a local server needs a login
 
 Any web page you visit can send requests to a port on your computer. So a request has to prove it came from your session:
@@ -39,6 +77,8 @@ Any web page you visit can send requests to a port on your computer. So a reques
 | Workspaces are named by an opaque id | any request reaching a folder you didn't list |
 | No route takes a command or a path to run | turning the gateway into a remote shell |
 | Artifacts always download, with `nosniff` and a sandbox policy | an artifact running as a page on this origin |
+| A fixed list of interface files, no path from a request ever reaches the disk | a request reading other files |
+| A content policy that allows only this server's own files, with no inline code | injected script running, and other sites framing the page |
 
 **What it doesn't protect against:** other programs running as your user can read the terminal output and the browser's
 cookies. The traffic is plain HTTP over loopback, which doesn't leave your computer. Don't put a proxy in front of it to
@@ -58,6 +98,7 @@ Everything needs the session cookie. Every `POST` also needs the `X-Dev-Guru-CSR
 | `GET /api/v1/code?workspace=ID` | the code graph; also `path`, `q`, `kinds`, `budget`, `collapse`, `depth` |
 | `POST /api/v1/plans/prepare` | preview a workflow draft: `{workspace, draft}`. Runs nothing |
 | `POST /api/v1/runs` | start a run: `{workspace, kind, parameters, idempotency_key}`. Answers `202` straight away |
+| `GET /api/v1/runs?workspace=ID` | the latest 100 runs, newest first, and the total |
 | `GET /api/v1/runs/RUN?workspace=ID` | a run's state |
 | `GET /api/v1/runs/RUN/events?workspace=ID&after=N` | events after number `N` |
 | `POST /api/v1/runs/RUN/cancel` | cancel: `{workspace}` |
@@ -81,6 +122,8 @@ conflict or stale plan `409`, unless it's marked retryable. An unexpected error 
 
 ## Limits
 
-- A run that was executing when the server stopped stays `running`. Nothing resumes it.
+- A run that was executing when the server stopped stays `running`, and one still waiting stays `queued`. Nothing resumes
+  them, so the interface keeps showing them as going. You can cancel them.
 - At most two runs execute at a time. Others wait.
-- Cancelling takes effect between steps.
+- Cancelling marks the run straight away. Work already in a step finishes behind it without changing the run's state, and
+  a workflow stops before its next step.

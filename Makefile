@@ -49,7 +49,11 @@ ACCEPTANCE_VENV := .acceptance-venv
 ACCEPTANCE_EXTRAS ?=
 ACCEPTANCE_ARGS ?=
 
-.PHONY: acceptance acceptance-wheel acceptance-dist
+.PHONY: acceptance acceptance-wheel acceptance-dist web-journeys
+# The web interface in real Chrome on its own temporary workspace (also a scenario in the suite). Needs Node 22+ and Chrome.
+web-journeys:
+	PATH="$(CURDIR)/.venv/bin:$$PATH" node acceptance/browser/web_journeys.mjs
+
 acceptance:
 	$(UV) run --frozen pytest acceptance -n auto -p no:cacheprovider $(ACCEPTANCE_ARGS)
 
