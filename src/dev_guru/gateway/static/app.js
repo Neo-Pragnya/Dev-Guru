@@ -317,7 +317,6 @@ async function sources(query) {
 // ------------------------------------------------------------------ not here yet: say so, and say what works today
 const UNSUPPORTED = {
   workflows: ["Workflows", "Assembling workflows in the browser isn't in this version.", ["ananke app workflow-preview DRAFT", "ananke app workflow-run DRAFT --backend B --plan-hash H --key K"]],
-  quality: ["Quality", "Quality views aren't in this version.", ["dev explore ."]],
   docs: ["Documentation", "The documentation studio isn't in this version.", ["dev present SLIDES.md", "dev diagram DOCUMENT.md"]],
   learning: ["Learning review", "Reviewing learning candidates in the browser isn't in this version.", ["dev learning review NAME"]],
 };
@@ -326,6 +325,38 @@ function unsupported([title, text, commands]) {
   const main = page(title, text);
   main.append(el("h2", { text: "What works today" }), el("ul", {}, ...commands.map((c) => el("li", {}, el("code", { text: c })))));
 }
+
+// ------------------------------------------------------------------ repository analysis, shared by map.js and insights.js
+const views = {};
+const analysisKeys = {};
+
+async function startAnalysis(checkVulnerabilities) {
+  const name = checkVulnerabilities ? "cves" : "plain";
+  // Trying again after a lost connection repeats the same request, in case the first one did arrive.
+  analysisKeys[name] = analysisKeys[name] || crypto.randomUUID();
+  const run = await api("/api/v1/runs", {
+    kind: "repo.analyze",
+    parameters: checkVulnerabilities ? { check_vulnerabilities: true } : {},
+    idempotency_key: analysisKeys[name],
+  });
+  delete analysisKeys[name];
+  location.hash = `#/runs/${run.run_id}`;
+}
+
+// Calls render(report) with the newest analysis, or offers to run one. Asking for it is what starts it: nothing runs by itself.
+async function withAnalysis(main, render) {
+  try {
+    const report = await api(scoped("/api/v1/intel"));
+    render(report);
+  } catch (error) {
+    if (error.code !== "INTEL_MISSING") { showError(main, error); return; }
+    const button = el("button", { type: "button", id: "analyze", text: "Analyse this repository" });
+    button.addEventListener("click", () => startAnalysis(false).catch((e) => showError(main, e)));
+    main.append(el("p", { text: "This repository hasn't been analysed yet. Analysis reads its files and runs nothing." }), button);
+  }
+}
+
+window.DevGuru = { el, api, scoped, page, banner, showError, when, statePill, views, withAnalysis, startAnalysis };
 
 // ------------------------------------------------------------------ shell
 async function route(moveFocus = true) {
@@ -349,6 +380,12 @@ async function route(moveFocus = true) {
     const detail = runDetail(id, loaded);
     if (moveFocus) main.focus();
     await detail;
+    return;
+  }
+  if (Object.hasOwn(views, section)) {
+    await views[section](main, query, id);
+    loaded();
+    if (moveFocus && shown === state.shown) main.focus();
     return;
   }
   if (section === "") await overview();
