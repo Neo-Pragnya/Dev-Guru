@@ -1,12 +1,37 @@
 <!doctype html>
 <html lang="en">
+<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dev Guru</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/app.css">
+<script src="/app.js" defer></script>
+</head>
 <body>
-<main>
-<h1>Dev Guru</h1>
-<p>The local gateway is running. The web interface isn't part of this version yet; the API is at <code>/api/v1/</code>.</p>
-</main>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="#/"><span class="flame" aria-hidden="true"></span>Dev Guru</a>
+  <label class="field">Workspace <select id="workspace"></select></label>
+  <span id="harness" class="pill" role="status"></span>
+  <button id="theme" class="ghost" type="button">Theme</button>
+</header>
+<div id="banner" class="banner" role="status" aria-live="polite" hidden></div>
+<div class="layout">
+  <nav aria-label="Main">
+    <p class="nav-title">Available</p>
+    <a href="#/" data-route="">Overview</a>
+    <a href="#/runs" data-route="runs">Runs</a>
+    <a href="#/code" data-route="code">Code</a>
+    <a href="#/sources" data-route="sources">Capabilities</a>
+    <p class="nav-title">Not in this version</p>
+    <a href="#/workflows" data-route="workflows">Workflows</a>
+    <a href="#/quality" data-route="quality">Quality</a>
+    <a href="#/docs" data-route="docs">Documentation</a>
+    <a href="#/learning" data-route="learning">Learning review</a>
+  </nav>
+  <main id="main" tabindex="-1"></main>
+</div>
+<noscript><p>This interface needs JavaScript. The <code>dev</code> commands work without it.</p></noscript>
 </body>
 </html>

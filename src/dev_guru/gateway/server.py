@@ -19,6 +19,7 @@ import hmac
 import json
 import re
 import secrets
+import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from http.cookies import CookieError, SimpleCookie
@@ -35,6 +36,13 @@ HOST = "127.0.0.1"
 MAX_BODY_BYTES = 2_000_000
 RUN_WORKERS = 2
 CSRF_HEADER = "X-Dev-Guru-CSRF"
+# A fixed list, so no request path ever becomes a file path.
+_STATIC = {
+    "/": ("index.html", "text/html; charset=utf-8"),
+    "/app.js": ("app.js", "text/javascript; charset=utf-8"),
+    "/app.css": ("app.css", "text/css; charset=utf-8"),
+    "/favicon.svg": ("favicon.svg", "image/svg+xml"),
+}
 _RUN_ID = r"run-[0-9a-f]+"
 _ARTIFACT = r"[A-Za-z0-9_][A-Za-z0-9_.-]*"
 # The status for what Ananke refuses; anything retryable is 503, and anything else here is 400.
@@ -46,6 +54,20 @@ _REFUSAL_STATUS = {
     "STALE_PLAN": 409,
     "DIGEST_MISMATCH": 409,
 }
+
+
+def _same(sent: str, secret: str) -> bool:
+    """Compare in constant time. As bytes, because ``compare_digest`` raises on text that isn't ASCII."""
+    return hmac.compare_digest(sent.encode("utf-8", "replace"), secret.encode())
+
+
+class _Server(ThreadingHTTPServer):
+    daemon_threads = True
+
+    def handle_error(self, request: Any, client_address: Any) -> None:
+        """A browser dropping a connection is normal, and shouldn't print a stack trace in the user's terminal."""
+        if not isinstance(sys.exc_info()[1], ConnectionError):
+            super().handle_error(request, client_address)
 
 
 class _Reject(Exception):
@@ -69,8 +91,7 @@ class Gateway:
         self._login_token: str | None = secrets.token_urlsafe(32)
         self._login_lock = threading.Lock()
         self.csrf = hmac.new(self._session.encode(), b"csrf", hashlib.sha256).hexdigest()
-        self._server = ThreadingHTTPServer((HOST, port), _handler_for(self))
-        self._server.daemon_threads = True
+        self._server = _Server((HOST, port), _handler_for(self))
         self.port = int(self._server.server_address[1])
         self.cookie_name = f"dev_guru_session_{self.port}"  # cookies aren't separated by port
         self.origins = {f"http://{HOST}:{self.port}", f"http://localhost:{self.port}"}
@@ -84,13 +105,13 @@ class Gateway:
     def redeem(self, token: str) -> bool:
         """The login token works once. A link left in a history or a terminal log opens nothing later."""
         with self._login_lock:
-            if self._login_token and hmac.compare_digest(token, self._login_token):
+            if self._login_token and _same(token, self._login_token):
                 self._login_token = None
                 return True
         return False
 
     def is_session(self, value: str) -> bool:
-        return hmac.compare_digest(value, self._session)
+        return _same(value, self._session)
 
     def session_cookie(self) -> str:
         return f"{self.cookie_name}={self._session}; HttpOnly; SameSite=Strict; Path=/"
@@ -195,7 +216,7 @@ class _Handler(BaseHTTPRequestHandler):
 
     def _check_csrf(self) -> None:
         sent = self.headers.get(CSRF_HEADER, "")
-        if not hmac.compare_digest(sent, self.gateway.csrf):
+        if not _same(sent, self.gateway.csrf):
             raise _Reject(403, "CSRF_REJECTED", f"a change needs the {CSRF_HEADER} header")
 
     def _read_json(self) -> dict[str, Any]:
@@ -251,9 +272,10 @@ class _Handler(BaseHTTPRequestHandler):
             return
         self._check_origin(required=False)
         self._check_session()
-        if url.path == "/":
-            page = (Path(__file__).parent / "static" / "index.html").read_bytes()
-            self._send(200, page, "text/html; charset=utf-8")
+        served = _STATIC.get(url.path)
+        if served:
+            page = (Path(__file__).parent / "static" / served[0]).read_bytes()
+            self._send(200, page, served[1])
             return
         self._api_get(url.path, query)
 
@@ -309,6 +331,8 @@ class _Handler(BaseHTTPRequestHandler):
                     depth=self._int(query, "depth", 1),
                 )
             )
+        elif path == "/api/v1/runs":
+            self._json(client.run_history(root))
         elif match := re.fullmatch(rf"/api/v1/runs/({_RUN_ID})", path):
             self._json(client.get_run(root, match[1]))
         elif match := re.fullmatch(rf"/api/v1/runs/({_RUN_ID})/events", path):

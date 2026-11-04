@@ -18,6 +18,8 @@ capabilities:
   - { id: sources, title: "Source-neutral discovery; explore runs through the Ananke app facade and records the report; Dex-free", dimension: core, blocker: true }
   - { id: diagram, title: "dev diagram: cited SVG from documents; prose can't add edges; safe output", dimension: core, blocker: true }
   - { id: gateway, title: "dev serve: loopback only, single-use login, origin and CSRF checks, scoped workspaces; a run reaches real Ananke", dimension: security, blocker: true }
+  - { id: web-shell, title: "The web interface ships in the wheel, needs no Node, works by keyboard and on a phone, and says plainly what isn't in this version", dimension: experience, blocker: true }
+  - { id: run-console, title: "The run console catches up after a lost connection or a gap, survives a tab reload, and only cancels when asked", dimension: experience, blocker: true }
   - { id: cli-ux, title: "Errors are clean, carry stable codes, and refusals exit non-zero", dimension: usability, blocker: false }
 
 # Every user-facing command.

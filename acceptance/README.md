@@ -18,4 +18,7 @@ make acceptance-wheel      # the built wheel in a fresh venv (what ships)
 - Never commit secret-shaped strings: `Given the file "x" with content containing a fake "aws-access-key" credential:`
   (with `{credential}` in the docstring) generates one at runtime.
 
+- **Browser journeys** (`browser/*.mjs`) drive real Chrome from a scenario, with no extra dependency beyond Node 22+.
+  `browser/web_journeys.mjs` builds its own temporary Git workspace on every run; `make web-journeys` runs it alone.
+
 Step vocabulary and gate rules: see `harness.py` (docstrings) or the capability-acceptance skill.

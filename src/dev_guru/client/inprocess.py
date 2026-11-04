@@ -125,6 +125,9 @@ class InProcessAnanke:
     def get_run(self, workspace: Path, run_id: str) -> dict[str, Any]:
         return dict(self._call(workspace, lambda f: f.get_run(run_id)))
 
+    def run_history(self, workspace: Path) -> dict[str, Any]:
+        return dict(self._call(workspace, lambda f: f.evidence_view()))
+
     def run_events(self, workspace: Path, run_id: str, after: int = 0) -> dict[str, Any]:
         return dict(self._call(workspace, lambda f: f.stream_events(run_id, after)))
 

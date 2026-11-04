@@ -10,6 +10,41 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
 
 ---
 
+## [0.4.0] — 2026-11-03
+
+### Added
+
+- **A web interface in `dev serve`.** Overview, runs, a code view and capabilities from your sources, as plain files in
+  the package: no Node and no build step. Runs are shown live, survive a tab reload and a lost connection, name any
+  events no longer kept, and stop only when you press Cancel. It works from the keyboard and on a phone. Pages that
+  don't exist yet say so and name the commands that work today. Guide: [The local gateway](docs/guides/gateway.md).
+- `GET /api/v1/runs`, the runs in a workspace.
+- Real-Chrome journeys for the interface, on a temporary workspace they build themselves (`make web-journeys`, and part
+  of the acceptance suite).
+- [ROADMAP.md](ROADMAP.md): what's released and what's planned.
+- Dependabot for `uv` and GitHub Actions, with a seven-day cooldown.
+
+### Changed
+
+- Needs Ananke 0.3.19 or newer, for its fixes to path traversal and vulnerable dependencies.
+- CI grants `security-events: write` only to the jobs that upload findings.
+- Releases are created with `gh release` rather than a third-party action.
+- CI installs Trivy with retries and a pinned SHA-256 rather than through a third-party action, so one failed DNS lookup can't block a release.
+
+### Fixed
+
+- The run console could stop without showing a run's final event, if it read between the run's final state and that event.
+
+- The gateway answered a login token or CSRF token that wasn't ASCII with a `500`. It's now the usual refusal. No request
+  got through either way.
+
+### Security
+
+- Reviewed two Semgrep findings as false positives and marked each in the code with its reason. Reviewed findings no
+  longer reappear as new alerts when a line moves.
+
+---
+
 ## [0.3.0] — 2026-11-03
 
 ### Added

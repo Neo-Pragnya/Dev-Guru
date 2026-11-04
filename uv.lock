@@ -9,7 +9,7 @@ resolution-markers = [
 
 [[package]]
 name = "ananke-plexus"
-version = "0.3.17"
+version = "0.3.19"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
@@ -22,9 +22,9 @@ dependencies = [
     { name = "rich" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/79/d5/6b563e5839b27aefa640c19662354473296a8b69d11a9ed9e7f6d7b129f0/ananke_plexus-0.3.17.tar.gz", hash = "sha256:bade642b6f79051b19e30fdee031fd84b4eac78dcf503ccbc0556617d2eaf685", size = 7745248, upload-time = "2026-11-03T06:48:21.072Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/29/47/2528aa3ce86f19541be218cd82295167332ed930d26d84c8623f6d596fd8/ananke_plexus-0.3.19.tar.gz", hash = "sha256:c637e726acabd30eeb156c0beed16344b29640ef6451502227e5c25344d31076", size = 7746451, upload-time = "2026-11-04T00:13:36.284Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0c/14/081c3d6351a4e9102caad4461e753c48f7b77419ab160c80e91c4800a708/ananke_plexus-0.3.17-py3-none-any.whl", hash = "sha256:d10c31842b6f0ce154fd8347cc1bfe6c5f12b8033b1ba535cfbd90e182ccabf2", size = 4773962, upload-time = "2026-11-03T06:48:18.7Z" },
+    { url = "https://files.pythonhosted.org/packages/df/dc/c52db1c3bd1c72ef55ae49f7161d683f07de136afde19444dbbddec63c07/ananke_plexus-0.3.19-py3-none-any.whl", hash = "sha256:a986f71d55dcf244b17a9ec5a787e93c2fb3d62fecc72a642e14669c3deacd1b", size = 4775482, upload-time = "2026-11-04T00:13:33.779Z" },
 ]
 
 [[package]]
@@ -295,7 +295,7 @@ dex = [
 
 [package.metadata]
 requires-dist = [
-    { name = "ananke-plexus", specifier = ">=0.3.17,<0.4" },
+    { name = "ananke-plexus", specifier = ">=0.3.19,<0.4" },
     { name = "dex-trove", marker = "extra == 'dex'", specifier = ">=0.1.6" },
     { name = "hatchling", marker = "extra == 'dev'", specifier = ">=1.26" },
     { name = "markdown-it-py", specifier = ">=3,<5" },

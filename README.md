@@ -47,7 +47,7 @@ dev present talk.md                  # Markdown slides → one offline, accessib
 dev diagram docs/arch.md             # an animated SVG of what a document states, every edge cited
 dev explore . --profile public       # a report safe to publish: no source, docstrings or Git revision
 dev sources                          # capabilities from your folders, private Git and Dex Trove
-dev serve                            # a local, authenticated gateway to Ananke for browsers
+dev serve                            # a local web interface: live runs, the code graph, your capabilities
 dev learning review NAME             # review what Ananke learned before it becomes reusable
 ```
 
@@ -61,11 +61,20 @@ with GuruClient(workspace="path/to/project") as guru:
     guru.export(result, output="explorer.html")
 ```
 
+## In your browser
+
+`dev serve` opens a web interface to what Ananke computes. It shows what's connected, starts and follows runs (which
+survive a reload or a lost connection, and stop only when you press Cancel), browses the code graph, and searches your
+capabilities. It listens only on your computer, only the link it prints gets in, and it needs no Node: everything comes
+from the [Dev Guru package on PyPI](https://pypi.org/project/dev-guru/). See [The local gateway](docs/guides/gateway.md).
+
+What's coming next, including code maps, flows, ERDs and CVE views, is in the [roadmap](ROADMAP.md).
+
 ## How it fits together
 
 | Repository | Role |
 | --- | --- |
-| **Dev Guru** (this repo) | The product: CLI and SDK, report view models and renderers, later a local web UI |
+| **Dev Guru** (this repo) | The product: CLI and SDK, report view models and renderers, a local web interface |
 | [Ananke Plexus](https://github.com/Neo-Pragnya/Ananke-Plexus) | The harness: code graph, analysis, workflows, policy, runs and evidence |
 | [Dex Trove](https://github.com/Neo-Pragnya/Dex-Trove) | Optional capability memory: curated skills, agents, instructions and workflows |
 
@@ -76,7 +85,8 @@ required. See [Architecture](docs/concepts/architecture.md) and [How Dev Guru ta
 
 ```bash
 make verify             # ruff, ruff format, strict mypy, pytest
-make acceptance-wheel   # capability scenarios on the built wheel, including real-Chrome report journeys
+make acceptance-wheel   # capability scenarios on the built wheel, including real-Chrome journeys
+make web-journeys       # just the web interface, in real Chrome, on a temporary workspace
 make scan               # gitleaks, pip-audit, GuardDog and Bandit on dist/
 ```
 

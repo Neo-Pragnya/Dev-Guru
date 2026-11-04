@@ -27,6 +27,7 @@ Dev Guru is on PyPI as [`dev-guru`](https://pypi.org/project/dev-guru/).
 | `dev present` | One offline, accessible HTML deck from Markdown slides |
 | `dev diagram` | An animated SVG of what a document states, every edge cited |
 | `dev sources` | Capabilities from your folders, private Git and Dex Trove |
+| `dev serve` | A local web interface: live runs, the code graph and your capabilities. See [The local gateway](guides/gateway.md) |
 | `dev learning review` | A review page for what Ananke learned, before it becomes reusable |
 | `dev doctor` | Checks that a compatible Ananke is installed and has what Dev Guru needs |
 | `GuruClient(...).explore()` | The same, from Python |
@@ -38,3 +39,4 @@ Dev Guru is on PyPI as [`dev-guru`](https://pypi.org/project/dev-guru/).
 - [Python SDK](guides/sdk.md): use Dev Guru from scripts and notebooks.
 - [How it fits together](concepts/architecture.md): Dev Guru, Ananke Plexus and Dex Trove.
 - [Report safety](concepts/report-safety.md): why a report can't run code or phone home.
+- [Roadmap](https://github.com/Neo-Pragnya/Dev-Guru/blob/main/ROADMAP.md): what's released and what's planned.

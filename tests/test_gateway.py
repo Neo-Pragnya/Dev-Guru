@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import http.client
 import json
+import re
+import socket
+import struct
 import subprocess
 import threading
 import time
@@ -421,3 +424,224 @@ def test_an_unexpected_error_tells_the_browser_nothing_internal(
     monkeypatch.setattr(browser.g.client, "get_run", boom)
     status, _, data = browser.raw("GET", f"/api/v1/runs/run-1?workspace={browser.workspace}")
     assert status == 500 and b"secret" not in data and b"INTERNAL_ERROR" in data
+
+
+def test_a_browser_dropping_a_connection_prints_nothing(
+    gateway: Gateway, capfd: pytest.CaptureFixture[str]
+) -> None:
+    conn = socket.create_connection((HOST, gateway.port))
+    conn.setsockopt(
+        socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0)
+    )  # close with a reset
+    conn.send(b"GET ")
+    conn.close()
+    time.sleep(0.3)
+    assert "Traceback" not in capfd.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("path", "media"),
+    [
+        ("/", "text/html"),
+        ("/app.js", "text/javascript"),
+        ("/app.css", "text/css"),
+        ("/favicon.svg", "image/svg+xml"),
+    ],
+)
+def test_the_interface_files_need_a_session_and_have_the_right_type(
+    browser: Browser, gateway: Gateway, path: str, media: str
+) -> None:
+    assert Browser(gateway).raw("GET", path)[0] == 401
+    status, headers, body = browser.raw("GET", path)
+    assert status == 200 and headers["content-type"].startswith(media) and body
+
+
+@pytest.mark.parametrize(
+    "path", ["/index.html", "/static/app.js", "/../server.py", "/app.js/../../server.py"]
+)
+def test_only_listed_files_are_served(browser: Browser, path: str) -> None:
+    assert browser.raw("GET", path)[0] == 404
+
+
+def test_the_page_has_no_inline_code_for_the_content_policy_to_block(browser: Browser) -> None:
+    _, _, page = browser.raw("GET", "/")
+    text = page.decode()
+    assert "<style" not in text and " onclick" not in text
+    assert all('src="' in tag for tag in text.split("<script")[1:])
+
+
+# ------------------------------------------------------------------ every route, not just the first ones written
+GET_ROUTES = [
+    "/",
+    "/app.js",
+    "/app.css",
+    "/favicon.svg",
+    "/api/v1/session",
+    "/api/v1/health",
+    "/api/v1/workspaces",
+    "/api/v1/capabilities?workspace=W",
+    "/api/v1/sources?workspace=W",
+    "/api/v1/code?workspace=W",
+    "/api/v1/runs?workspace=W",
+    "/api/v1/runs/run-0123?workspace=W",
+    "/api/v1/runs/run-0123/events?workspace=W",
+    "/api/v1/runs/run-0123/artifacts?workspace=W",
+    "/api/v1/runs/run-0123/artifacts/graph-snapshot.json?workspace=W",
+]
+POST_ROUTES = ["/api/v1/plans/prepare", "/api/v1/runs", "/api/v1/runs/run-0123/cancel"]
+
+
+@pytest.mark.parametrize("path", GET_ROUTES)
+def test_every_read_needs_a_session_and_refuses_other_sites(
+    browser: Browser, gateway: Gateway, path: str
+) -> None:
+    target = path.replace("W", browser.workspace)
+    assert Browser(gateway).raw("GET", target)[0] == 401
+    for headers in ({"Origin": "https://evil.example"}, {"Sec-Fetch-Site": "cross-site"}):
+        status, sent, data = browser.raw("GET", target, headers=headers)
+        assert status == 403 and json.loads(data)["error"]["code"] == "ORIGIN_REJECTED"
+        assert "access-control-allow-origin" not in sent
+
+
+@pytest.mark.parametrize("path", POST_ROUTES)
+def test_every_change_needs_session_origin_csrf_and_json(
+    browser: Browser, gateway: Gateway, path: str
+) -> None:
+    body = json.dumps({"workspace": browser.workspace}).encode()
+    good = {"Origin": browser.origin, "Content-Type": "application/json", CSRF_HEADER: gateway.csrf}
+    for change, expected in (
+        ({"Origin": ""}, "ORIGIN_REJECTED"),
+        ({"Origin": "https://evil.example"}, "ORIGIN_REJECTED"),
+        ({"Origin": "null"}, "ORIGIN_REJECTED"),
+        ({"Sec-Fetch-Site": "same-site"}, "ORIGIN_REJECTED"),
+        ({CSRF_HEADER: ""}, "CSRF_REJECTED"),
+        ({CSRF_HEADER: "guess"}, "CSRF_REJECTED"),
+        ({"Content-Type": "text/plain"}, "UNSUPPORTED_MEDIA_TYPE"),
+    ):
+        status, _, data = browser.raw("POST", path, headers={**good, **change}, body=body)
+        assert status >= 400 and json.loads(data)["error"]["code"] == expected, change
+    assert Browser(gateway).raw("POST", path, headers=good, body=body)[0] == 401
+    assert not (browser.g.roots[browser.workspace] / ".ananke" / "app" / "runs").exists()
+
+
+@pytest.mark.parametrize("method", ["PUT", "PATCH", "DELETE", "OPTIONS", "HEAD", "TRACE"])
+def test_other_methods_are_refused_with_no_cors(browser: Browser, method: str) -> None:
+    status, headers, _ = browser.raw(method, "/api/v1/runs", headers={"Origin": browser.origin})
+    assert status == 405 and "access-control-allow-origin" not in headers
+
+
+@pytest.mark.parametrize(
+    ("change", "status", "expected"),
+    [
+        ({"Cookie": "dev_guru_session_PORT=caf\xe9"}, 401, "NOT_AUTHENTICATED"),
+        ({CSRF_HEADER: "caf\xe9"}, 403, "CSRF_REJECTED"),
+    ],
+)
+def test_text_that_isnt_ascii_is_a_refusal_not_a_crash(
+    browser: Browser, gateway: Gateway, change: dict[str, str], status: int, expected: str
+) -> None:
+    sent = {
+        "Origin": browser.origin,
+        "Content-Type": "application/json",
+        CSRF_HEADER: gateway.csrf,
+        "Cookie": browser.cookie,
+        **{k: v.replace("PORT", str(gateway.port)) for k, v in change.items()},
+    }
+    body = json.dumps({"workspace": browser.workspace}).encode()
+    got, _, data = browser.raw("POST", "/api/v1/runs", headers=sent, body=body)
+    assert got == status and json.loads(data)["error"]["code"] == expected
+
+
+def test_a_login_token_that_isnt_ascii_is_a_refusal_not_a_crash(gateway: Gateway) -> None:
+    status, _, data = Browser(gateway).raw("GET", "/login?token=caf%C3%A9")
+    assert status == 401 and json.loads(data)["error"]["code"] == "NOT_AUTHENTICATED"
+
+
+def test_the_content_policy_is_strict_on_everything_served(
+    browser: Browser, gateway: Gateway
+) -> None:
+    answers = [browser.raw("GET", path.replace("W", browser.workspace)) for path in GET_ROUTES[:9]]
+    answers.append(Browser(gateway).raw("GET", "/"))  # a refusal
+    answers.append(browser.raw("GET", "/nope"))
+    for _, headers, _ in answers:
+        policy = headers["content-security-policy"]
+        assert "default-src 'self'" in policy and "frame-ancestors 'none'" in policy
+        assert "base-uri 'none'" in policy and "unsafe" not in policy and "*" not in policy
+        assert headers["x-content-type-options"] == "nosniff"
+
+
+# ------------------------------------------------------------------ what the page does with server text
+STATIC = Path(__file__).parents[1] / "src" / "dev_guru" / "gateway" / "static"
+
+
+def test_server_text_has_no_way_to_become_markup() -> None:
+    script = (STATIC / "app.js").read_text()
+    for sink in (
+        "innerHTML",
+        "outerHTML",
+        "insertAdjacentHTML",
+        "document.write",
+        "eval(",
+        "new Function",
+        "srcdoc",
+        'setAttribute("on',
+    ):
+        assert sink not in script, sink
+
+
+def test_every_link_the_page_builds_starts_somewhere_fixed() -> None:
+    script = (STATIC / "app.js").read_text()
+    hrefs = re.findall(r"\bhref:\s*([^,}]+)", script)
+    assert len(hrefs) >= 4
+    for value in hrefs:
+        assert value.startswith(('"#/', "`#/", "scoped(`/api/v1/")), value
+    assert ".href =" not in script and 'setAttribute("href"' not in script
+    assert 'if (key === "href" && !LINK.test(value))' in script
+    assert "const LINK = /^(#\\/|\\/api\\/v1\\/)/;" in script
+
+
+def test_the_page_loads_only_this_gateways_files() -> None:
+    page = (STATIC / "index.html").read_text()
+    assert "http://" not in page and "https://" not in page and "//" not in page.replace("<!--", "")
+    assert set(re.findall(r'(?:src|href)="(/[^"]*)"', page)) == {
+        "/favicon.svg",
+        "/app.css",
+        "/app.js",
+    }
+    for name in ("app.js", "app.css", "favicon.svg"):
+        text = (STATIC / name).read_text()
+        assert "http://" not in text.replace("http://www.w3.org/2000/svg", "")
+        assert "https://" not in text and "@import" not in text
+
+
+# ------------------------------------------------------------------ the run console's API
+def test_run_history_lists_runs_newest_first(browser: Browser) -> None:
+    assert browser.get("/api/v1/runs")[1] == {"total": 0, "runs": []}
+    _, one = browser.post("/api/v1/runs", {"kind": "graph.build", "idempotency_key": "one"})
+    browser.finish(one["run_id"])
+    _, two = browser.post("/api/v1/runs", {"kind": "graph.build", "idempotency_key": "two"})
+    browser.finish(two["run_id"])
+    status, history = browser.get("/api/v1/runs")
+    assert status == 200 and history["total"] == 2
+    assert {r["run_id"] for r in history["runs"]} == {one["run_id"], two["run_id"]}
+    assert history["runs"][0]["created_at"] >= history["runs"][1]["created_at"]
+
+
+def test_events_dropped_from_the_record_come_back_as_a_gap_with_the_run(browser: Browser) -> None:
+    _, run = browser.post("/api/v1/runs", {"kind": "graph.build", "idempotency_key": "g"})
+    browser.finish(run["run_id"])
+    log = (
+        browser.g.roots[browser.workspace]
+        / ".ananke"
+        / "app"
+        / "runs"
+        / run["run_id"]
+        / "events.jsonl"
+    )
+    lines = log.read_text().splitlines()
+    log.write_text("\n".join(lines[2:]) + "\n")
+    status, seen = browser.get(f"/api/v1/runs/{run['run_id']}/events")
+    assert status == 200 and seen["gap"] == {"from": 1, "to": 2}
+    assert seen["run"]["state"] == "succeeded" and seen["events"][-1]["type"] == "run.succeeded"
+    last = seen["events"][-1]["seq"]
+    assert "gap" not in browser.get(f"/api/v1/runs/{run['run_id']}/events?after={last}")[1]

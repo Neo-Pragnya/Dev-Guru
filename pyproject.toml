@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "dev-guru"
 dynamic = ["version"]
-description = "Dev Guru: understand, improve, verify and learn from your software. A local-first developer product on the Ananke Plexus harness: Python SDK and CLI first, offline HTML reports, later a local web UI."
+description = "Dev Guru: understand, improve, verify and learn from your software. A local-first developer product on the Ananke Plexus harness: Python SDK and CLI, offline HTML reports and a local web interface."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
@@ -28,7 +28,7 @@ classifiers = [
 # Dev Guru is a client of Ananke: the harness owns analysis, execution and evidence (docs/architecture.md).
 # Keep this range in step with SUPPORTED_ANANKE in src/dev_guru/client/negotiation.py (tests/test_packaging.py).
 dependencies = [
-  "ananke-plexus>=0.3.17,<0.4",
+  "ananke-plexus>=0.3.19,<0.4",
   "markdown-it-py>=3,<5",
   "pydantic>=2.11,<3",
   "rich>=13",
