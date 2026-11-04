@@ -176,6 +176,9 @@ async function runDetail(runId, loaded) {
   state.stop = () => { stopped = true; };
   let after = 0;
   let wait = POLL_MS;
+  let lastEvent = null;
+  // Ananke records a run's final state just before its final event, so a read can land between the two.
+  let finalChecks = 3;
 
   cancel.addEventListener("click", async () => {
     cancel.disabled = true;
@@ -200,7 +203,7 @@ async function runDetail(runId, loaded) {
     notes.replaceChildren(...warnings(run));
     const seen = await api(scoped(`/api/v1/runs/${runId}/events`, { after }));
     if (seen.gap) timeline.append(el("li", { class: "muted", text: `Events ${seen.gap.from} to ${seen.gap.to} are no longer kept.` }));
-    for (const event of seen.events) { addEvent(event); after = event.seq; }
+    for (const event of seen.events) { addEvent(event); after = event.seq; lastEvent = event.type; }
     const listed = await api(scoped(`/api/v1/runs/${runId}/artifacts`));
     files.replaceChildren(listed.artifacts.length
       ? el("ul", {}, ...listed.artifacts.map((a) => el("li", {},
@@ -216,7 +219,7 @@ async function runDetail(runId, loaded) {
       if (stopped) return;
       banner("");
       wait = POLL_MS;
-      if (!ACTIVE.has(run.state)) return;
+      if (!ACTIVE.has(run.state) && (lastEvent === `run.${run.state}` || --finalChecks <= 0)) return;
     } catch (error) {
       if (stopped) return;
       if (!error.retryable) {

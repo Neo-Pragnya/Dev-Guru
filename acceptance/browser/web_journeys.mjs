@@ -210,6 +210,7 @@ await journey("with no graph yet, Code says so and offers to build it; the run i
   await until(`location.hash.startsWith("#/runs/run-")`, "the run page");
   await ready();
   await until(`${runState} === "succeeded"`, "the run to finish", 120000);
+  await until(`${eventTypes}.at(-1)?.startsWith("run.succeeded")`, "the final event in the timeline");
   const r = await evaluate(`({ events: ${eventTypes}, artifact: document.querySelector("#artifacts a")?.textContent, cancel: document.querySelector("#cancel").hidden })`);
   expect(r.events[0].startsWith("run.queued") && r.events.at(-1).startsWith("run.succeeded"), r.events.join(" | "));
   expect(r.artifact === "graph-snapshot.json", `artifact: ${r.artifact}`);

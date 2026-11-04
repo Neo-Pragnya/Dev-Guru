@@ -33,6 +33,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
 
 ### Fixed
 
+- The run console could stop without showing a run's final event, if it read between the run's final state and that event.
+
 - The gateway answered a login token or CSRF token that wasn't ASCII with a `500`. It's now the usual refusal. No request
   got through either way.
 
