@@ -381,7 +381,7 @@ await journey("a deck comes from a Markdown file, and a path out of the workspac
   })()`);
   expect(r.status === 400, `the escape got ${r.status}`);
   expect(r.listed.includes(".md"), r.listed);
-  await evaluate(`document.querySelector('#documents button').click()`);
+  await evaluate(`document.querySelector('#documents button[aria-label^="Make a deck"]').click()`);
   await until(`!!document.querySelector("#document-built") || !!document.querySelector('#document-result [role="alert"]')`, "the deck");
   expect(await evaluate(`!!document.querySelector("#document-built")`), `no deck: ${await text("#document-result")}`);
   expectedStatus = /status of (401|404|503)/;
