@@ -33,6 +33,7 @@ The gateway holds no domain logic. Ananke compiles, authorizes, runs and records
 | **Runs** | Build the code graph, and see this workspace's runs, newest first |
 | **A run** | Follow its state, events, warnings and artifacts as they happen, download artifacts, and cancel it |
 | **Code** | Browse the code graph by folder, file or symbol, within a node budget, and see where every link went |
+| **Code map, End-to-end flows, Data, API pathways, Architecture, Quality, Coverage, CVEs, Saving tokens** | See how a repository works. Read [Repository views](repository-views.md) |
 | **Capabilities** | Search what your sources offer. Being listed doesn't mean a capability is trusted or will run |
 
 If you started `dev serve` with several folders, the picker at the top chooses between them.

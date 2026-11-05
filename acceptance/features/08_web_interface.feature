@@ -77,3 +77,18 @@ Feature: The web interface is complete in what ships, and the run console holds 
       journeys passed
       """
     And it finishes within 280 seconds
+
+  @cap_web_shell
+  Scenario: The repository views draw a real repository correctly, in real Chrome
+    Given an empty directory
+    When I run "node $REPO/acceptance/browser/insight_journeys.mjs"
+    Then it succeeds
+    And the output contains each of:
+      """
+      a flow runs from the frontend call, through the route, to the tables
+      no ERD line runs through a table
+      the architecture is drawn from the inferred model
+      CVEs say they haven't been checked
+      all 14 journeys passed
+      """
+

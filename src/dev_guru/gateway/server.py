@@ -335,6 +335,23 @@ class _Handler(BaseHTTPRequestHandler):
                     depth=self._int(query, "depth", 1),
                 )
             )
+        elif path == "/api/v1/source":
+            # Ananke keeps this inside the workspace, and refuses harness state, Git data and environment files
+            self._json(
+                client.read_source(
+                    root,
+                    query.get("path", ""),
+                    self._int(query, "start", 1),
+                    self._int(query, "end", 1) if "end" in query else None,
+                )
+            )
+        elif path == "/api/v1/context":
+            self._json(
+                {
+                    **client.context_map(root, budget=self._int(query, "budget", 1500)),
+                    **client.context_status(root),
+                }
+            )
         elif path == "/api/v1/intel":
             self._json(self._latest_intel(root))
         elif path == "/api/v1/runs":

@@ -1,1 +1,27 @@
 /* Data, API pathways, architecture, quality, coverage and CVEs. */
+.erd { display: block; width: 100%; min-width: 560px; height: auto; }
+.table-card rect { fill: var(--surface-2); stroke: var(--line); stroke-width: 1.2; }
+.table-card .table-head { fill: var(--warn-soft); stroke: none; }
+.table-card.inferred rect { stroke-dasharray: 5 4; }
+.table-card { cursor: pointer; }
+.table-card:hover rect, .table-card:focus rect { stroke: var(--link); stroke-width: 2; }
+.table-card:focus { outline: none; }
+.table-name { fill: var(--ink); font: 600 13px var(--body); }
+.col { fill: var(--ink); font: 12px var(--mono); }
+.col.key { font-weight: 700; }
+.col-type { fill: var(--muted); font: 11px var(--mono); }
+.rel { fill: none; stroke: var(--link); stroke-width: 1.4; }
+.rel.inferred { stroke-dasharray: 5 4; }
+.mark { fill: none; stroke: var(--link); stroke-width: 1.2; }
+.limits { margin: 14px 0; color: var(--muted); }
+.method { font: 600 12px var(--mono); padding: 2px 8px; border-radius: 6px; background: var(--surface-2); }
+.method-get { background: var(--ok-soft); color: var(--ok); }
+.method-post, .method-put, .method-patch { background: var(--warn-soft); color: var(--warn); }
+.method-delete { background: var(--bad-soft); color: var(--bad); }
+#route-search { font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); margin-bottom: 8px; }
+.bars { display: block; width: 100%; max-width: 520px; height: auto; }
+.bar { fill: var(--link); }
+.bars-wrap { max-width: 540px; }
+.sev-critical, .sev-high { background: var(--bad-soft); color: var(--bad); }
+.sev-moderate, .sev-medium { background: var(--warn-soft); color: var(--warn); }
+.sev-low { background: var(--ok-soft); color: var(--ok); }

@@ -101,6 +101,19 @@ class InProcessAnanke:
     def harness_capabilities(self, workspace: Path) -> dict[str, Any]:
         return dict(self._call(workspace, lambda f: f.capabilities()))
 
+    def context_map(
+        self, workspace: Path, budget: int = 1500, refresh: bool = False
+    ) -> dict[str, Any]:
+        return dict(self._call(workspace, lambda f: f.context_map(budget=budget, refresh=refresh)))
+
+    def context_status(self, workspace: Path) -> dict[str, Any]:
+        return dict(self._call(workspace, lambda f: f.context_status()))
+
+    def read_source(
+        self, workspace: Path, path: str, start: int = 1, end: int | None = None
+    ) -> dict[str, Any]:
+        return dict(self._call(workspace, lambda f: f.read_source(path, start=start, end=end)))
+
     def code_view(self, workspace: Path, **filters: Any) -> dict[str, Any]:
         return dict(self._call(workspace, lambda f: f.code_view(**filters)))
 
@@ -183,6 +196,7 @@ class InProcessAnanke:
             ],
             edges=[
                 GraphEdgeData(
+                    resolved_target=str(getattr(e, "resolved_target", "") or ""),
                     source=e.source,
                     target=e.target,
                     kind=e.kind,

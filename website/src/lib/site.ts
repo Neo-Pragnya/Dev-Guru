@@ -83,7 +83,8 @@ export const DOC_NAV: { section: string; items: string[]; shapes: string; tint: 
       "guides/presentations",
       "guides/diagrams",
       "guides/sdk",
-      "guides/gateway"
+      "guides/gateway",
+      "guides/repository-views"
     ],
     "shapes": "hex>flower8",
     "tint": "lemon"
@@ -121,6 +122,7 @@ export const DOC_TITLES: Record<string, string> = {
   "guides/diagrams": "Diagrams from documents",
   "guides/sdk": "Python SDK",
   "guides/gateway": "The local gateway",
+  "guides/repository-views": "Repository views",
   "reference/cli": "CLI reference",
   "reference/report-format": "Report format"
 };

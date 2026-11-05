@@ -606,7 +606,11 @@ def test_the_page_loads_only_this_gateways_files() -> None:
     assert set(re.findall(r'(?:src|href)="(/[^"]*)"', page)) == {
         "/favicon.svg",
         "/app.css",
+        "/map.css",
+        "/insights.css",
         "/app.js",
+        "/map.js",
+        "/insights.js",
     }
     for name in ("app.js", "app.css", "favicon.svg"):
         text = (STATIC / name).read_text()

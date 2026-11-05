@@ -11,7 +11,7 @@ import importlib
 import re
 from importlib import metadata
 
-SUPPORTED_ANANKE = ">=0.3.20,<0.4"  # keep in step with pyproject.toml (tests/test_packaging.py)
+SUPPORTED_ANANKE = ">=0.3.22,<0.4"  # keep in step with pyproject.toml (tests/test_packaging.py)
 APP_PROTOCOL = "ananke-app/1"  # the app facade protocol this Dev Guru speaks
 
 # Capability id -> (module, attribute path). Required ones are what this release of Dev Guru calls.

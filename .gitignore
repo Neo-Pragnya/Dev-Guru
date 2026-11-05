@@ -20,3 +20,9 @@ acceptance/report/
 website/public/demo/
 /explorer.html
 /explorer.html.manifest.json
+
+# Local context tools
+.serena/
+graphify-out/
+!acceptance/fixtures/shop/**
+!acceptance/fixtures/shop/**/lib/
