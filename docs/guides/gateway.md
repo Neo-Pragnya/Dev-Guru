@@ -16,6 +16,11 @@ dev serve --no-open --port 8765
 
 It prints a link that works once. Opening it signs your browser in until the server stops.
 
+It opens on the explorer, the same as a report: Constellation, Flow, Impact, Calls, Hotspots and Tour, then every page
+below as a tab. The pages are live, so analysing, checking for vulnerabilities, previewing a workflow and building a
+deck all work. The pages alone are at `/app`. If the folder has no code graph yet, the explorer offers to build one:
+reading a page never starts anything.
+
 ```mermaid
 flowchart LR
   B[Browser] -- session cookie, CSRF token --> G[Gateway]

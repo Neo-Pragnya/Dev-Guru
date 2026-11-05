@@ -28,7 +28,7 @@ classifiers = [
 # Dev Guru is a client of Ananke: the harness owns analysis, execution and evidence (docs/architecture.md).
 # Keep this range in step with SUPPORTED_ANANKE in src/dev_guru/client/negotiation.py (tests/test_packaging.py).
 dependencies = [
-  "ananke-plexus>=0.3.27,<0.4",
+  "ananke-plexus>=0.3.28,<0.4",
   "markdown-it-py>=3,<5",
   "pydantic>=2.11,<3",
   "rich>=13",

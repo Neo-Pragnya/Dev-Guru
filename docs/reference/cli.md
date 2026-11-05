@@ -23,7 +23,7 @@ when compatible, `1` when Ananke is missing or incompatible, and `2` for an unkn
 ## `dev explore`
 
 ```text
-dev explore [WORKSPACE] [-o, --output FILE] [--name NAME] [--open] [--transport in-process] [--profile private|public] [--json]
+dev explore [WORKSPACE] [-o, --output FILE] [--name NAME] [--open] [--transport in-process] [--profile private|public] [-v, --verbose] [-q, --quiet] [--logs FILE] [--json]
 ```
 
 | Option | Default | Meaning |
@@ -33,7 +33,22 @@ dev explore [WORKSPACE] [-o, --output FILE] [--name NAME] [--open] [--transport 
 | `--name` | the folder name | project name shown in the report |
 | `--open` | off | open the report in your browser once it's written |
 | `--profile` | `private` | `public` removes source code, docstrings, string defaults in signatures and the Git revision, so the report is safe to publish; see [report safety](../concepts/report-safety.md#publication-profiles) |
-| `--json` | off | print `report`, `manifest`, `input_digest`, `project` counts and insight counts |
+| `-v, --verbose` | off | also say what each step found as it goes: files, links, packages, each section's state, source files read |
+| `-q, --quiet` | off | say nothing until it's done |
+| `--logs FILE` | none | write a record for finding faults: versions, operating system, each step with its time and findings, warnings, and any error in full. It holds no environment variables, tokens or file contents |
+| `--json` | off | print `report`, `manifest`, `input_digest`, `project` counts and insight counts. It says nothing else unless you add `--verbose` |
+
+It shows each step as it works, with a running clock, on standard error, so `--json` output stays clean. If the graph
+looks wrong, it says so whatever the options, for example when paths are written with backslashes, when none of many
+Python files import each other, or when hundreds of files land in one package:
+
+```text
+✓ Building the code graph 3.2s
+✓ Laying out the explorer's views 0.5s
+✓ Analysing the repository 5.0s
+✓ Collecting every page for the report 2.2s
+✓ Writing the report 0.3s
+```
 
 Exit `0` on success. Exit `1` with a stable error code (`WORKSPACE_INVALID`, `HARNESS_MISSING`, …) when nothing can
 be explored. An empty folder is an error, never an empty report. Set `SOURCE_DATE_EPOCH` for a reproducible
@@ -63,10 +78,12 @@ review decision, provenance, and a diff against each destination. Reviewing chan
 ## `dev serve`
 
 ```bash
-dev serve [WORKSPACE]... [--port N] [--open/--no-open] [--transport NAME]
+dev serve [WORKSPACE]... [--port N] [--open/--no-open] [--transport NAME] [--logs FILE]
 ```
 
 Starts [the local gateway and its web interface](../guides/gateway.md) for the listed folders, or the current one. It
+opens on the explorer, with all of its views, the same as a report. `--logs FILE` records every refusal and error,
+with the full trace of anything unexpected, but never a request's query, which can hold the sign-in link. It
 listens on this computer only and prints a link that works once. Stop it with Ctrl-C. Exits `2` if a folder doesn't exist or the port is taken.
 
 ## `dev diagram`

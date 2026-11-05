@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.15'",
@@ -9,7 +9,7 @@ resolution-markers = [
 
 [[package]]
 name = "ananke-plexus"
-version = "0.3.27"
+version = "0.3.28"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
@@ -22,9 +22,9 @@ dependencies = [
     { name = "rich" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f5/f5/22d23c2ec326b6eb5849717775d6d84120d44e88b39d64fbc4268850ebc4/ananke_plexus-0.3.27.tar.gz", hash = "sha256:2022e07b7feb7dc22d0b21b13990bcdd0450f8d8ade0ce976a64913739f94d92", size = 7902276, upload-time = "2026-11-05T07:51:11.705Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b0/47/755419728513022bf6c1c17a5e68fdf1bb374c5ee91a3f2628b38e710da0/ananke_plexus-0.3.28.tar.gz", hash = "sha256:66171853ade1614336a36645a16d1107ec72469763b351bcc473992776478a65", size = 7903701, upload-time = "2026-11-05T19:58:49.494Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2b/89/eefe85df31c5e75a8d664b904656f67097aa507f7816a1d3d248bcf0dbca/ananke_plexus-0.3.27-py3-none-any.whl", hash = "sha256:db4ee0260941f797cac5f190cd9efac135f862def9033c3ea0a181b0e3a6a3f9", size = 4948241, upload-time = "2026-11-05T07:51:09.039Z" },
+    { url = "https://files.pythonhosted.org/packages/4f/f4/2b6744d5a2af0d959fc71cc1527f1009cec2dade82922fc36ef7c905c987/ananke_plexus-0.3.28-py3-none-any.whl", hash = "sha256:ffb1df83cd1f921cba5c773c077617db47ecdbc6cd8c78d1edb3c69d77a109be", size = 4949793, upload-time = "2026-11-05T19:58:46.612Z" },
 ]
 
 [[package]]
@@ -295,7 +295,7 @@ dex = [
 
 [package.metadata]
 requires-dist = [
-    { name = "ananke-plexus", specifier = ">=0.3.27,<0.4" },
+    { name = "ananke-plexus", specifier = ">=0.3.28,<0.4" },
     { name = "dex-trove", marker = "extra == 'dex'", specifier = ">=0.1.6" },
     { name = "hatchling", marker = "extra == 'dev'", specifier = ">=1.26" },
     { name = "markdown-it-py", specifier = ">=3,<5" },

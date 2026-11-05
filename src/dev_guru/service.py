@@ -10,7 +10,8 @@ from typing import Any
 
 from dev_guru import errors
 from dev_guru.client import AnankeClient, connect
-from dev_guru.reports import model as explorer_model
+from dev_guru.progress import Progress, Silent
+from dev_guru.reports import model as view_model
 from dev_guru.reports import render
 
 
@@ -49,18 +50,41 @@ def explore(
     name: str | None = None,
     profile: str = "private",
     check_vulnerabilities: bool = False,
+    progress: Progress | None = None,
 ) -> ExploreResult:
+    progress = progress or Silent()
     client = client or connect()
     root = workspace.expanduser().resolve()
-    graph = client.graph_data(root)
-    model = explorer_model.build(graph, root, project_name=name)
+    with progress.step("Building the code graph"):
+        graph = client.graph_data(root)
+    files = sum(1 for n in graph.nodes if n.kind == "file")
+    progress.detail(
+        f"{files} files, {len(graph.nodes) - files} other nodes, {len(graph.edges)} links"
+    )
+    with progress.step("Laying out the explorer's views"):
+        model = view_model.build(graph, root, project_name=name)
+    from dev_guru import health
+
+    resolved = sum(1 for e in graph.edges if e.kind == "imports" and e.resolved_target)
+    progress.detail(
+        f"{resolved} imports between this repository's files, {len(model['packages'])} packages"
+    )
+    for warning in health.problems(graph, model):
+        progress.warn(warning)
     if not model["files"]:
         raise errors.GuruError(
             errors.WORKSPACE_INVALID,
             f"Ananke found no source files in {root}",
             hint="point dev explore at a folder with Python, JavaScript or TypeScript files, or notebooks",
         )
-    report, _run_id, problem = _analyse_repository(client, root, check_vulnerabilities)
+    title = "Analysing the repository" + (
+        ", and checking dependencies at osv.dev" if check_vulnerabilities else ""
+    )
+    with progress.step(title):
+        report, _run_id, problem = _analyse_repository(client, root, check_vulnerabilities)
+    if report is not None:
+        for section, found in report.get("sections", {}).items():
+            progress.detail(f"{section}: {found.get('status', 'unknown')}")
     if report is not None:
         try:
             from dev_guru.reports import repository, snapshot
@@ -72,9 +96,16 @@ def explore(
                 for n in graph.nodes
                 if n.kind == "file" and n.path and not str(n.path).endswith(".ipynb")
             ]
-            model["serve"] = snapshot.build(
-                client, root, report, sorted(set(written)), name or root.name, __version__
-            )
+            with progress.step("Collecting every page for the report"):
+                model["serve"] = snapshot.build(
+                    client,
+                    root,
+                    report,
+                    sorted(set(written)),
+                    name or root.name,
+                    __version__,
+                    progress=progress,
+                )
         except (errors.GuruError, OSError, ValueError, KeyError) as exc:
             model.pop("serve", None)
             problem = f"The repository analysis isn't included: {exc}"
@@ -104,15 +135,42 @@ def explore(
     )
 
 
+def explorer_model(
+    workspace: Path, *, client: AnankeClient, name: str | None = None
+) -> dict[str, Any]:
+    """The explorer's own views for ``dev serve``: the code graph laid out, and its manifest. The other pages ask
+    the gateway for what they need, so there's no repository analysis or recording here."""
+    root = workspace.expanduser().resolve()
+    # Reading a page never starts a run, so this uses the graph Ananke already has
+    graph = client.latest_graph(root)
+    if graph is None:
+        raise errors.GuruError(
+            errors.GRAPH_MISSING,
+            "There's no code graph for this workspace yet",
+            hint="build it from the explorer, or run dev explore once",
+        )
+    model = view_model.build(graph, root, project_name=name)
+    report_manifest = render.manifest(
+        model, workspace=root, ananke_version=graph.ananke_version, snapshot_id=graph.snapshot_id
+    )
+    report_manifest["transport"] = client.transport
+    report_manifest["publication"] = "dev-serve"
+    return {"model": model, "manifest": report_manifest}
+
+
 def export_html(
     result: ExploreResult,
     output: Path,
     *,
     title: str | None = None,
     client: AnankeClient | None = None,
+    progress: Progress | None = None,
 ) -> tuple[Path, Path]:
     """Write the report, then record it in the Ananke run it came from (when the transport has runs)."""
-    page, sidecar = render.write(result.model, result.manifest, output, title=title)
+    progress = progress or Silent()
+    with progress.step("Writing the report"):
+        page, sidecar = render.write(result.model, result.manifest, output, title=title)
+    progress.detail(f"{page.stat().st_size / 1_000_000:.1f} MB")
     if client is not None and result.run_id:
         client.register_artifact(
             result.workspace,
@@ -125,4 +183,4 @@ def export_html(
     return page, sidecar
 
 
-__all__ = ["ExploreResult", "explore", "export_html"]
+__all__ = ["ExploreResult", "explore", "explorer_model", "export_html"]

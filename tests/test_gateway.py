@@ -218,7 +218,7 @@ def test_responses_carry_security_headers(browser: Browser) -> None:
     _, headers, _ = browser.raw("GET", "/")
     assert headers["x-content-type-options"] == "nosniff"
     assert headers["referrer-policy"] == "no-referrer"
-    assert "frame-ancestors 'none'" in headers["content-security-policy"]
+    assert "frame-ancestors 'self'" in headers["content-security-policy"]
 
 
 @pytest.mark.parametrize(
@@ -443,6 +443,9 @@ def test_a_browser_dropping_a_connection_prints_nothing(
     ("path", "media"),
     [
         ("/", "text/html"),
+        ("/app", "text/html"),
+        ("/explorer.js", "text/javascript"),
+        ("/explorer.css", "text/css"),
         ("/app.js", "text/javascript"),
         ("/app.css", "text/css"),
         ("/favicon.svg", "image/svg+xml"),
@@ -463,16 +466,63 @@ def test_only_listed_files_are_served(browser: Browser, path: str) -> None:
     assert browser.raw("GET", path)[0] == 404
 
 
-def test_the_page_has_no_inline_code_for_the_content_policy_to_block(browser: Browser) -> None:
-    _, _, page = browser.raw("GET", "/")
+@pytest.mark.parametrize("path", ["/", "/app"])
+def test_the_page_has_no_inline_code_for_the_content_policy_to_block(
+    browser: Browser, path: str
+) -> None:
+    _, _, page = browser.raw("GET", path)
     text = page.decode()
-    assert "<style" not in text and " onclick" not in text
-    assert all('src="' in tag for tag in text.split("<script")[1:])
+    assert "<style" not in text and " onclick" not in text and ' style="' not in text
+    # a JSON block is data: a browser never runs it
+    assert all(
+        'src="' in tag or tag.startswith(' type="application/json"')
+        for tag in text.split("<script")[1:]
+    )
+
+
+def test_the_explorer_under_dev_serve_carries_no_data_and_no_offline_policy() -> None:
+    from dev_guru.reports import render
+
+    page = render.live_page()
+    assert set(re.findall(r'(?:src|href)="(/[^"]*)"', page)) == {
+        "/explorer.css",
+        "/explorer.js",
+        "/favicon.svg",
+    }
+    assert "http-equiv" not in page and "{{" not in page
+    assert '<script type="application/json" id="dg-live">true</script>' in page
+    assert '<script type="application/json" id="dg-data">null</script>' in page
+
+
+def test_the_explorer_never_builds_a_graph_by_being_read(browser: Browser) -> None:
+    status, body = browser.get("/api/v1/explorer")
+    assert status == 503 and body["error"]["code"] == "GRAPH_MISSING"
+    assert not (Path(browser.g.roots[browser.workspace]) / ".ananke" / "app" / "runs").exists()
+
+
+def test_the_explorer_shows_the_code_graph_once_its_built(browser: Browser) -> None:
+    status, run = browser.post("/api/v1/runs", {"kind": "graph.build", "idempotency_key": "g"})
+    assert status == 202
+    for _ in range(100):
+        if browser.get(f"/api/v1/runs/{run['run_id']}")[1]["state"] == "succeeded":
+            break
+        time.sleep(0.1)
+    status, model = browser.get("/api/v1/explorer")
+    assert status == 200
+    assert model["model"]["files"] and model["manifest"]["publication"] == "dev-serve"
+
+
+def test_other_sites_still_cant_frame_the_gateway(browser: Browser) -> None:
+    _, headers, _ = browser.raw("GET", "/")
+    assert "frame-ancestors 'self'" in headers["content-security-policy"]
 
 
 # ------------------------------------------------------------------ every route, not just the first ones written
 GET_ROUTES = [
     "/",
+    "/app",
+    "/explorer.js",
+    "/explorer.css",
     "/app.js",
     "/app.css",
     "/favicon.svg",
@@ -565,7 +615,7 @@ def test_the_content_policy_is_strict_on_everything_served(
     answers.append(browser.raw("GET", "/nope"))
     for _, headers, _ in answers:
         policy = headers["content-security-policy"]
-        assert "default-src 'self'" in policy and "frame-ancestors 'none'" in policy
+        assert "default-src 'self'" in policy and "frame-ancestors 'self'" in policy
         assert "base-uri 'none'" in policy and "unsafe" not in policy and "*" not in policy
         assert headers["x-content-type-options"] == "nosniff"
 

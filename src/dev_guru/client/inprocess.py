@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
@@ -114,6 +115,25 @@ class InProcessAnanke:
     ) -> dict[str, Any]:
         return dict(self._call(workspace, lambda f: f.read_source(path, start=start, end=end)))
 
+    def read_sources(self, workspace: Path, paths: list[str]) -> dict[str, Any]:
+        """Many files in one call. Ananke before 0.3.28 has no batch read, so then it's one call per file."""
+
+        def batch(facade: Any) -> dict[str, Any]:
+            if hasattr(facade, "read_sources"):
+                return dict(facade.read_sources(paths))
+            from ananke.plexus.app import AppError
+
+            files: dict[str, Any] = {}
+            problems: dict[str, str] = {}
+            for path in paths:
+                try:
+                    files[path] = facade.read_source(path)
+                except AppError as exc:
+                    problems[path] = exc.code
+            return {"files": files, "problems": problems}
+
+        return dict(self._call(workspace, batch))
+
     def code_view(self, workspace: Path, **filters: Any) -> dict[str, Any]:
         return dict(self._call(workspace, lambda f: f.code_view(**filters)))
 
@@ -165,9 +185,11 @@ class InProcessAnanke:
         try:
             prepared = facade.prepare_run("graph.build")
             # the same workspace state is the same request: re-exploring unchanged code reuses the run
-            run = facade.submit_run(
-                prepared, "dev-guru-explore-" + prepared.locked_plan_digest[:24]
-            )
+            # A folder copied or moved with its .ananke history is another workspace to Ananke, so the key says which.
+            key = hashlib.sha256(
+                f"{facade.workspace_id()}|{prepared.locked_plan_digest}".encode()
+            ).hexdigest()
+            run = facade.submit_run(prepared, "dev-guru-explore-" + key[:24])
             run_id = run["run_id"]
             if run["state"] != "succeeded":
                 reasons = (
@@ -184,10 +206,26 @@ class InProcessAnanke:
             )
         except AppError as exc:
             raise errors.GuruError(errors.HARNESS_FAILED, exc.message, run_id=run_id) from exc
+        return self._graph(snapshot, info.ananke_version, f"ananke run {run_id}", run_id)
+
+    def latest_graph(self, workspace: Path) -> GraphData | None:
+        """The newest code graph Ananke already has, without building one. ``None`` when there's none yet."""
+        info = self.require_compatible()
+        from ananke.plexus.graph.service import load_graph
+
+        snapshot = load_graph(self._root(workspace))
+        if snapshot is None:
+            return None
+        return self._graph(snapshot, info.ananke_version, "the latest graph Ananke built", None)
+
+    @staticmethod
+    def _graph(
+        snapshot: Any, ananke_version: str | None, source: str, run_id: str | None
+    ) -> GraphData:
         return GraphData(
             snapshot_id=snapshot.snapshot_id,
             provider=snapshot.provider,
-            ananke_version=info.ananke_version,
+            ananke_version=ananke_version,
             nodes=[
                 GraphNodeData(
                     id=n.node_id, kind=n.kind, name=n.name, path=n.path, metadata=dict(n.metadata)
@@ -206,8 +244,8 @@ class InProcessAnanke:
                 )
                 for e in snapshot.edges
             ],
-            source=f"ananke run {run_id}",
-            run_id=run_id,
+            source=source,
+            run_id=run_id or "",
         )
 
     def register_artifact(

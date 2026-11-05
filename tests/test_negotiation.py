@@ -11,7 +11,8 @@ from dev_guru.client import inprocess, negotiation
 @pytest.mark.parametrize(
     ("version", "ok"),
     [
-        ("0.3.27", True),
+        ("0.3.28", True),
+        ("0.3.27", False),
         ("0.3.26", False),
         ("0.3.99", True),
         ("0.3.13", False),
