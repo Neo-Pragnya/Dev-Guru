@@ -1,0 +1,12 @@
+# Findings a person has reviewed, read by scripts/scan_dist.py at every release. Each needs a reason. A rule accepted
+# with `paths` is accepted only there: the same rule matching anywhere else blocks the release.
+
+[heuristics]
+capability-filesystem-read = "gateway/documents.py reads a Markdown file the user picks, inside the workspace only"
+capability-network-download = "client/inprocess.py p.fetch(): reads a capability from a source the user configured, on disk or in their Git"
+capability-network-outbound = "cli.py webbrowser.open on the report file just written, a file:// URL"
+capability-process-spawn = "a JavaScript regular expression's .exec() in gateway/static/map.js; nothing is started"
+
+[heuristics.threat-filesystem-read]
+reason = "tests that hostile paths such as ../../etc/passwd and .env are refused, and that an error never reaches the browser"
+paths = ["tests/test_gateway.py"]
