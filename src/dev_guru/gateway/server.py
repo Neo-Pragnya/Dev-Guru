@@ -30,6 +30,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from dev_guru import errors
 from dev_guru.client.port import AnankeClient
+from dev_guru.gateway import documents
 from dev_guru.version import __version__
 
 HOST = "127.0.0.1"
@@ -45,6 +46,7 @@ _STATIC = {
     "/map.css": ("map.css", "text/css; charset=utf-8"),
     "/insights.css": ("insights.css", "text/css; charset=utf-8"),
     "/insights.js": ("insights.js", "text/javascript; charset=utf-8"),
+    "/studio.js": ("studio.js", "text/javascript; charset=utf-8"),
     "/favicon.svg": ("favicon.svg", "image/svg+xml"),
 }
 _RUN_ID = r"run-[0-9a-f]+"
@@ -345,6 +347,12 @@ class _Handler(BaseHTTPRequestHandler):
                     self._int(query, "end", 1) if "end" in query else None,
                 )
             )
+        elif path == "/api/v1/learning":
+            self._json({"candidates": client.learning_candidates(root)})
+        elif match := re.fullmatch(r"/api/v1/learning/([\w.-]{1,120})", path):
+            self._json(client.learning_candidate(root, match[1]).model_dump())
+        elif path == "/api/v1/documents":
+            self._json({"documents": documents.listed(root)})
         elif path == "/api/v1/context":
             self._json(
                 {
@@ -385,6 +393,13 @@ class _Handler(BaseHTTPRequestHandler):
         client = self.gateway.client
         if path == "/api/v1/plans/prepare":
             self._json(client.prepare_plan(root, self._object(body, "draft")))
+        elif path == "/api/v1/documents/build":
+            try:
+                self._json(
+                    documents.build(root, str(body.get("path", "")), str(body.get("what", "")))
+                )
+            except documents.DocumentError as exc:
+                raise _Reject(400, exc.code, str(exc)) from exc
         elif path == "/api/v1/runs":
             run = client.submit_run(
                 root,

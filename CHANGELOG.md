@@ -10,6 +10,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
 
 ---
 
+## [0.7.0] — 2026-11-05
+
+### Added
+
+- **Workflows.** Put capabilities in order with a form, from a blank draft or a starting shape. Steps are linked by the type of what they take and give, and Ananke checks the draft and shows what would run, its order, permissions and approvals, or its own typed problems. Previewing runs nothing. A draft can be exported and imported.
+- **Documentation.** Turn any Markdown file in the workspace into an offline deck, or a diagram of what it states. Each comes back as a download, and nothing in the workspace changes.
+- **Learning review.** See what Ananke learned, its evidence, and how it would change each destination, before it becomes reusable. It's read-only, so rejecting can't publish anything.
+
+Nothing in the navigation is marked as missing any more. All three are in the offline file too, where building and previewing say to use `dev serve`.
+
+---
+
 ## [0.6.0] — 2026-11-05
 
 ### Added

@@ -117,7 +117,7 @@ def _serve_shell() -> str:
         text = text.replace(link, f"<style>{(static / name).read_text(encoding='utf-8')}</style>")
     host = (static / "static_host.js").read_text(encoding="utf-8")
     scripts = f"<script>{host}</script>"
-    for name in ("app.js", "map.js", "insights.js"):
+    for name in ("app.js", "map.js", "insights.js", "studio.js"):
         text = text.replace(f'<script src="/{name}" defer></script>', "")
         scripts += f"<script>{(static / name).read_text(encoding='utf-8')}</script>"
     return text.replace("</body>", f"{scripts}</body>")

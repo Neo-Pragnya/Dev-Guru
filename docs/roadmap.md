@@ -13,6 +13,7 @@ released.
 
 | Version | Highlights |
 | --- | --- |
+| **0.7.0** | Workflows, Documentation and Learning review in the web interface, so nothing is marked as missing |
 | **0.6.0** | One offline file with every page of `dev serve`, and an example that shows them all. Folders of notebooks: code in `%%writefile` cells counts, and a Notebooks page explains each one. Impact and paths on the Code map |
 | **0.5.1** | The Architecture page lists differences from a declared model. A guide to mapping a new repository |
 | **0.5.0** | How a repository works, in `dev serve`: a code map across folders, end-to-end flows, an ERD, API pathways, a CALM architecture, quality, coverage, CVEs and saving tokens. `dev context` for AI assistants |
@@ -35,12 +36,9 @@ The rules they follow:
 - **Unknown isn't zero.** With no coverage report, the view says so rather than show 0%. A skipped CVE scan doesn't read as clean.
 - **Nothing happens behind your back.** Analysis reads files and runs nothing. Checking for CVEs uses the network only when you ask.
 
-## Planned: the rest of the web interface
+## Planned: going further in the web interface
 
-These pages are in the navigation today, marked "Not in this version", and each names the commands that work meanwhile.
+- **A drag-and-drop workflow canvas**, with the same draft format as the form, and running from the browser.
+- **BPMN process design**, from reviewed processes, with editable rendering.
+- **Richer documents:** outlines by audience, and previewing in the page.
 
-| Page | What it will do | Status |
-| --- | --- | --- |
-| **Workflows** | Assemble and preview a workflow in the browser, then run it | Planned |
-| **Documentation** | Make decks and diagrams from your documents in the browser | Planned |
-| **Learning review** | Review what Ananke learned before it becomes reusable | Planned |

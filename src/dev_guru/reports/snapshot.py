@@ -113,7 +113,17 @@ def build(
         offered = [c.model_dump() for c in client.discover_capabilities(root, "")][:500]
     except (errors.GuruError, OSError, ValueError):
         offered = []
+    from dev_guru.gateway import documents
+
+    learning: dict[str, Any] = {}
+    try:
+        for candidate in client.learning_candidates(root)[:50]:
+            learning[candidate] = client.learning_candidate(root, candidate).model_dump()
+    except (errors.GuruError, OSError, ValueError):
+        learning = {}
     return {
+        "learning": learning,
+        "documents": documents.listed(root),
         "workspace": {"id": "report", "name": name, "path": ""},
         "health": {"ok": info.compatible, "gateway": version, "harness": info.model_dump()},
         "capabilities": capabilities,

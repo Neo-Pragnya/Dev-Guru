@@ -17,6 +17,9 @@ window.DEV_GURU_STATIC = (() => {
     if (route === "workspaces") return { workspaces: [data.workspace] };
     if (route === "health") return data.health;
     if (route === "capabilities") return data.capabilities;
+    if (route === "documents") return { documents: data.documents };
+    if (route === "learning") return { candidates: Object.keys(data.learning) };
+    if (route.startsWith("learning/") && data.learning[decodeURIComponent(route.slice(9))]) return data.learning[decodeURIComponent(route.slice(9))];
     if (route === "context") return data.context;
     if (route === "runs") return data.runs;
     if (route === "intel") return { ...data.intel };

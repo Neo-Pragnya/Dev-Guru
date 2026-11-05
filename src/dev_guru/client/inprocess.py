@@ -258,6 +258,14 @@ class InProcessAnanke:
             for d in found
         ]
 
+    def learning_candidates(self, workspace: Path) -> list[str]:
+        """Names of the candidates waiting for review."""
+        self.require_compatible()
+        from ananke.plexus.learning import candidates_dir
+
+        folder = candidates_dir(self._root(workspace))
+        return sorted(p.name for p in folder.iterdir() if p.is_dir()) if folder.is_dir() else []
+
     def learning_candidate(self, workspace: Path, name: str) -> LearningCandidate:
         """Ananke's view of a learning candidate, and a diff against each writable destination."""
         import difflib

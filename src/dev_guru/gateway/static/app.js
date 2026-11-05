@@ -347,17 +347,6 @@ async function sources(query) {
 }
 
 // ------------------------------------------------------------------ not here yet: say so, and say what works today
-const UNSUPPORTED = {
-  workflows: ["Workflows", "Assembling workflows in the browser isn't in this version.", ["ananke app workflow-preview DRAFT", "ananke app workflow-run DRAFT --backend B --plan-hash H --key K"]],
-  docs: ["Documentation", "The documentation studio isn't in this version.", ["dev present SLIDES.md", "dev diagram DOCUMENT.md"]],
-  learning: ["Learning review", "Reviewing learning candidates in the browser isn't in this version.", ["dev learning review NAME"]],
-};
-
-function unsupported([title, text, commands]) {
-  const main = page(title, text);
-  main.append(el("h2", { text: "What works today" }), el("ul", {}, ...commands.map((c) => el("li", {}, el("code", { text: c })))));
-}
-
 // ------------------------------------------------------------------ repository analysis, shared by map.js and insights.js
 const views = {};
 const analysisKeys = {};
@@ -424,7 +413,6 @@ async function route(moveFocus = true) {
   else if (section === "runs") await runs();
   else if (section === "code") await code(query);
   else if (section === "sources") await sources(query);
-  else if (Object.hasOwn(UNSUPPORTED, section)) unsupported(UNSUPPORTED[section]);
   else page("Not found", "There's no such page.");
   loaded();
   if (moveFocus && shown === state.shown) main.focus(); // not on first load: the keyboard starts at the top, with the skip link

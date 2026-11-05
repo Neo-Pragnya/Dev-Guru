@@ -161,17 +161,17 @@ export const FEATURES: { title: string; text: string; href: string; shapes: stri
 export const STATS: { label: string; value: string; tint: string }[] = [
   {
     "label": "Views in one offline file",
-    "value": "20",
+    "value": "23",
     "tint": "coral"
   },
   {
     "label": "Unit tests",
-    "value": "143",
+    "value": "151",
     "tint": "teal"
   },
   {
     "label": "Browser journeys per release",
-    "value": "48",
+    "value": "51",
     "tint": "lilac"
   }
 ];
