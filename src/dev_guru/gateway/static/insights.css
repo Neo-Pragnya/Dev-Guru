@@ -37,4 +37,8 @@ button.link { padding: 0; border: 0; background: none; color: var(--link); text-
 #cve-list th:nth-child(-n+3), #cve-list td:nth-child(-n+3), #cve-list th:nth-child(5), #cve-list td:nth-child(5) { white-space: nowrap; }
 #cve-list td:nth-child(4) { min-width: 150px; }
 #cve-list td:nth-child(6) { min-width: 280px; }
+.workflow-step { margin: 10px 0; }
+.workflow-step legend { font-weight: 600; padding: 0 6px; }
+.workflow-step .field { flex: 1 1 200px; }
+.workflow-step input, .workflow-step select { width: 100%; }
 

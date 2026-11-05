@@ -803,6 +803,9 @@
     code: ["#/code", "⌘", "Code", "Browse the code graph by folder, file or symbol."],
     runs: ["#/runs", "▶", "Runs", "What ran to make this report."],
     capabilities: ["#/sources", "❖", "Capabilities", "What your sources offer."],
+    workflows: ["#/workflows", "⛓", "Workflows", "Put capabilities in order, and see what would run."],
+    documents: ["#/docs", "❏", "Documentation", "Decks and diagrams from your Markdown."],
+    learning: ["#/learning", "✓", "Learning review", "What was learned, before it becomes reusable."],
   };
   if (SERVE) {
     window.DEV_GURU_REPORT = SERVE;

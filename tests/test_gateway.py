@@ -611,6 +611,7 @@ def test_the_page_loads_only_this_gateways_files() -> None:
         "/app.js",
         "/map.js",
         "/insights.js",
+        "/studio.js",
     }
     for name in ("app.js", "app.css", "favicon.svg"):
         text = (STATIC / name).read_text()

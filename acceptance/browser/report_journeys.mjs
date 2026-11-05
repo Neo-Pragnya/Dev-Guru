@@ -141,7 +141,7 @@ await journey("nothing is fetched from the network", async () => {
 });
 await journey("every page of dev serve is in the file, works, and fetches nothing", async () => {
   const tabs = await evaluate(`[...document.querySelectorAll(".tab")].map((t) => t.dataset.view)`);
-  const want = ["overview", "codemap", "e2e", "data", "apis", "architecture", "quality", "coverage", "cves", "tokens", "code", "runs", "capabilities"];
+  const want = ["overview", "codemap", "e2e", "data", "apis", "architecture", "quality", "coverage", "cves", "tokens", "code", "runs", "capabilities", "workflows", "documents", "learning"];
   if (!tabs.includes("overview")) { // a public report keeps counts alone
     if (!tabs.includes("repository")) return "this report has no analysis";
     await evaluate(`document.querySelector('.tab[data-view="repository"]').click()`);

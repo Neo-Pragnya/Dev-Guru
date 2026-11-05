@@ -65,9 +65,9 @@ when you ask it to.
 
 ## Every page of `dev serve`, in the file
 
-The tabs after Tour are the pages of [`dev serve`](repository-views.md): Overview, Code map, End-to-end flows, Notebooks, Data, API pathways, Architecture, Quality, Coverage, CVEs, Saving tokens, Code, Runs and Capabilities. They're the same pages, with a recording of what they ask for, so you can step through a flow or read a table's fields with nothing running.
+The tabs after Tour are the pages of [`dev serve`](repository-views.md): Overview, Code map, End-to-end flows, Notebooks, Data, API pathways, Architecture, Quality, Coverage, CVEs, Saving tokens, Code, Runs, Capabilities, Workflows, Documentation and Learning review. They're the same pages, with a recording of what they ask for, so you can step through a flow or read a table's fields with nothing running.
 
-A file can't start anything, so its buttons for analysing, checking for vulnerabilities and starting a run say to use `dev serve`. It makes no network requests, so CVEs say they weren't checked unless you ask when you make it:
+A file can't start anything, so its buttons for analysing, checking for vulnerabilities, starting a run, previewing a workflow and building a deck say to use `dev serve`. It makes no network requests, so CVEs say they weren't checked unless you ask when you make it:
 
 ```bash
 dev explore . -o report.html --check-vulnerabilities

@@ -178,14 +178,12 @@ await journey("the interface works from the keyboard alone", async () => {
   expect(r.h1 === "Runs" && r.current === "Runs", JSON.stringify(r));
   expect(r.focus === "main", `focus went to ${r.focus}, not the new page`);
 });
-await journey("pages that don't exist yet say so and name what works today", async () => {
-  const under = await evaluate(`(() => { const out = []; let later = false; for (const n of document.querySelector("nav").children) { if (n.classList.contains("nav-title")) later = n.textContent === "Not in this version"; else if (later) out.push(n.dataset.route); } return out; })()`);
-  expect(under.join() === "workflows,docs,learning", `listed as not in this version: ${under}`);
-  for (const [hash, command] of [["#/workflows", "ananke app workflow-preview"], ["#/docs", "dev present"], ["#/learning", "dev learning review"]]) {
+await journey("nothing is left marked as missing, and an unknown page says so", async () => {
+  const titles = await evaluate(`[...document.querySelectorAll("nav .nav-title")].map((n) => n.textContent)`);
+  expect(!titles.includes("Not in this version"), `still listed: ${titles}`);
+  for (const [hash, title] of [["#/workflows", "Workflows"], ["#/docs", "Documentation"], ["#/learning", "Learning review"]]) {
     await route(hash);
-    const t = await text("#main");
-    expect(/isn't in this version|aren't in this version/.test(t), `${hash} says: ${t.slice(0, 80)}`);
-    expect(t.includes(command), `${hash} doesn't mention ${command}`);
+    expect((await text("#main h1")) === title, `${hash} shows ${await text("#main h1")}`);
   }
   await route("#/nowhere");
   expect((await text("h1")) === "Not found", "an unknown page isn't called out");

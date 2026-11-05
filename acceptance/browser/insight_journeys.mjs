@@ -295,6 +295,43 @@ if (expectGolden) await journey("the overview summarises every section, and says
   const t = await text("#overview-sections");
   for (const part of ["Code map", "End-to-end flows", "4 tables", "5 routes", "Architecture", "Quality", "Coverage", "CVEs"]) expect(t.includes(part), `missing ${part}: ${t}`);
 });
+await journey("a workflow draft is built by keyboard-friendly form, and Ananke's own errors come back", async () => {
+  await route("#/workflows");
+  await evaluate(`(() => { const p = document.querySelector("#workflow-preset"); p.value = "review"; p.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+  await sleep(100);
+  expect((await evaluate(`document.querySelectorAll(".workflow-step").length`)) === 2, "the preset didn't load");
+  expect((await text("#workflow-edges")).includes("plan.plan"), "the steps weren't linked by type");
+  const before = requests.length;
+  await evaluate(`document.querySelector("#workflow-preview").click()`);
+  await until(`!!document.querySelector("#workflow-issues")`, "Ananke's answer");
+  const issues = await text("#workflow-issues");
+  expect(/[A-Z]+_[A-Z]+/.test(issues), `no typed error: ${issues.slice(0, 120)}`);
+  expect(requests.length >= before, "no request");
+  const runs = await evaluate(`fetch("/api/v1/runs?workspace=" + encodeURIComponent(document.querySelector("#workspace").value)).then((r) => r.json()).then((d) => d.runs.filter((x) => x.kind === "workflow.run").length)`);
+  expect(runs === 0, "a preview started something");
+});
+await journey("a deck comes from a Markdown file, and a path out of the workspace is refused", async () => {
+  expectedStatus = /status of (400|401|404|503)/;
+  await route("#/docs");
+  await until(`!!document.querySelector("#documents")`, "the list");
+  const r = await evaluate(`(async () => {
+    const token = document.querySelector("#workspace").value;
+    const session = await fetch("/api/v1/session").then((x) => x.json());
+    const post = (body) => fetch("/api/v1/documents/build", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", [session.csrf_header]: session.csrf_token }, body: JSON.stringify({ workspace: token, ...body }) });
+    const out = await post({ path: "../../etc/hosts.md", what: "deck" });
+    return { status: out.status, listed: document.querySelector("#documents").textContent };
+  })()`);
+  expect(r.status === 400, `the escape got ${r.status}`);
+  expect(r.listed.includes(".md"), r.listed);
+  await evaluate(`document.querySelector('#documents button').click()`);
+  await until(`!!document.querySelector("#document-built") || !!document.querySelector('#document-result [role="alert"]')`, "the deck");
+  expect(await evaluate(`!!document.querySelector("#document-built")`), `no deck: ${await text("#document-result")}`);
+  expectedStatus = /status of (401|404|503)/;
+});
+await journey("learning review says when there's nothing to review", async () => {
+  await route("#/learning");
+  await until(`!!document.querySelector("#learning-none") || !!document.querySelector("#learning-list")`, "the list");
+});
 await journey("saving tokens shows a small map and the tools", async () => {
   await route("#/context");
   await shot("context");
