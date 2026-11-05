@@ -25,6 +25,8 @@ Open any of these pages and choose **Analyse this repository**. Analysis reads y
 | **Quality** | Where are the complexity, the large files and the tests? |
 | **Coverage** | What do the tests cover, per file? |
 | **CVEs** | Which dependencies are vulnerable? |
+| **Findings** | What did scanners and test runs report, and what should I fix first? |
+| **What's certain** | How far can I trust each view? |
 | **Saving tokens** | What's the smallest useful picture of this repository for an AI assistant? |
 
 ### Code map
@@ -57,6 +59,14 @@ These pages keep "unknown" apart from "zero":
 
 - **Coverage** reads a report your tests already produced. Without one, it says so rather than show 0%.
 - **CVEs** say they haven't been checked, not that you're clean. Checking uses the network, so it happens only when you ask.
+
+### Findings
+
+Reads reports already in the repository, and runs nothing: `*.sarif` from tools like CodeQL, Semgrep, Trivy or Bandit, and JUnit XML from your test runner, in files named like `junit*.xml` or `test-results*.xml`. **What to fix first** puts failing tests, the worst findings and packages with a known fix in one short list. A report may be older than the code, and with no report the page says it's unknown.
+
+### What's certain
+
+Each view's state, what's always inferred, and every limit the analysis noted, in one place. Read this before relying on a view.
 
 ### Saving tokens
 

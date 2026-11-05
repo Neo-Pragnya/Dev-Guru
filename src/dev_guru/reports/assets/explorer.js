@@ -799,6 +799,8 @@
     quality: ["#/quality", "◈", "Quality", "Complexity, size and tests."],
     coverage: ["#/coverage", "▤", "Coverage", "What the tests cover, per file."],
     cves: ["#/cves", "⚠", "CVEs", "Known vulnerabilities in dependencies, and what fixes them."],
+    findings: ["#/findings", "⚑", "Findings", "What scanners and test runs reported, and what to fix first."],
+    certainty: ["#/certainty", "≈", "What's certain", "How far to trust each view, and what the analysis couldn't tell."],
     tokens: ["#/context", "✂", "Saving tokens", "A small map of this repository for an AI assistant."],
     code: ["#/code", "⌘", "Code", "Browse the code graph by folder, file or symbol."],
     runs: ["#/runs", "▶", "Runs", "What ran to make this report."],

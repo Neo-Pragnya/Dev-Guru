@@ -1,0 +1,1 @@
+<testsuite name="shop"><testcase classname="tests.orders" name="test_create_order"/><testcase classname="tests.orders" name="test_discount"/><testcase classname="tests.orders" name="test_refund"><failure message="the refund was 0"/></testcase></testsuite>

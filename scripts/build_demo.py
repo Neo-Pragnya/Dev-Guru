@@ -26,6 +26,8 @@ def main() -> int:
         shop = Path(scratch) / "shop"
         shutil.copytree(REPOSITORY / "acceptance" / "fixtures" / "shop", shop)
         shutil.copytree(REPOSITORY / "acceptance" / "fixtures" / "notebooks", shop / "course")
+        for report in (REPOSITORY / "acceptance" / "fixtures" / "reports").iterdir():
+            shutil.copy(report, shop / report.name)
         for pinned in shop.rglob(
             "*.pins"
         ):  # old on purpose, and kept out of this repository as manifests

@@ -373,6 +373,65 @@
   });
 
   // ------------------------------------------------------------------ saving tokens
+  // ---------------------------------------------------------------- findings
+  const FIRST = { critical: 0, high: 1, medium: 2, low: 3 };
+  views.findings = async () => {
+    page("Findings", "What scanners and test runs already reported, from the reports in this repository, and what to fix first. Nothing was run.");
+    const root = main();
+    await withAnalysis(root, (report) => {
+      const data = report.sections.findings;
+      if (!data) { root.append(el("p", { text: "This analysis has no findings section. Analyse the repository again." })); return; }
+      const found = data.findings || [];
+      const tests = data.tests || [];
+      const failed = tests.reduce((sum, t) => sum + t.failed, 0);
+      const total = tests.reduce((sum, t) => sum + t.total, 0);
+      root.append(el("div", { class: "cards" }, stat(data.reports?.length ? found.length : null, "Scanner findings"), stat(total ? total : null, "Tests in the reports"), stat(total ? failed : null, "Tests failing")));
+      if (data.status === "not_found") root.append(el("p", { id: "findings-unknown", text: "There's no SARIF or JUnit report here, so these are unknown. That doesn't mean there are none." }));
+      const vulns = (report.sections.dependencies?.vulnerabilities || []).filter((v) => v.fixed_in);
+      const steps = [
+        ...tests.flatMap((t) => t.failures).slice(0, 10).map((f) => [`Failing test`, f.name, f.message || "See the report."]),
+        ...found.filter((f) => FIRST[f.severity] <= 1).slice(0, 10).map((f) => [f.severity, `${f.rule} in ${f.path}${f.line ? `:${f.line}` : ""}`, f.remediation || f.message]),
+        ...[...new Map(vulns.map((v) => [v.package, v])).values()].slice(0, 10).map((v) => ["Vulnerable package", `${v.package} ${v.version}`, `Upgrade to ${v.fixed_in} or later.`]),
+      ];
+      if (steps.length) root.append(el("h2", { text: "What to fix first" }), table("findings-first", ["What", "Where", "What to do"], steps));
+      if (found.length) {
+        root.append(el("h2", { text: data.findings_total > found.length ? `Scanner findings (worst ${found.length} of ${data.findings_total})` : "Scanner findings" }),
+          table("findings-list", ["Severity", "Rule", "Where", "Tool", "Message"], found.map((f) => [el("span", { class: `pill sev-${f.severity}`, text: f.severity }), f.rule, f.path ? `${f.path}${f.line ? `:${f.line}` : ""}` : "", f.tool, f.message])));
+      }
+      if (tests.length) {
+        root.append(el("h2", { text: "Test results" }), table("findings-tests", ["Report", "Total", "Passed", "Failed", "Skipped"], tests.map((t) => [t.report, t.total, t.passed, t.failed, t.skipped])));
+        const failures = tests.flatMap((t) => t.failures);
+        if (failures.length) root.append(table("findings-failures", ["Failing test", "Message", "Report"], failures.map((f) => [f.name, f.message, f.report])));
+      }
+      const more = limits(data);
+      if (more) root.append(more);
+    });
+  };
+
+  // ---------------------------------------------------------------- what's certain
+  const SECTION_NAMES = { overview: "Overview", data: "Data", api: "API pathways", flows: "End-to-end flows", calm: "Architecture", quality: "Quality", coverage: "Coverage", dependencies: "CVEs", notebooks: "Notebooks", findings: "Findings" };
+  const STATE_WORDS = { found: "Found", none: "Nothing here", not_found: "Unknown: no report here", not_scanned: "Unknown: not checked", failed: "This analysis failed", partial: "Partly read" };
+  views.certainty = async () => {
+    page("What's certain", "How far to trust each view: what was read, what was inferred, and everything the analysis couldn't tell.");
+    const root = main();
+    await withAnalysis(root, (report) => {
+      const sections = Object.entries(report.sections);
+      const count = (status) => sections.filter(([, s]) => s.status === status).length;
+      const unknown = count("not_found") + count("not_scanned");
+      const edges = report.sections.calm?.model?.relationships || [];
+      const inferredTables = (report.sections.data?.tables || []).filter((t) => String(t.source || "").startsWith("inferred")).length;
+      const notes = sections.reduce((sum, [, s]) => sum + (s.limits || []).length, 0);
+      root.append(el("div", { class: "cards" }, stat(count("found"), "Views with results"), stat(unknown, "Views that are unknown"), stat(count("failed"), "Views that failed"), stat(notes, "Limits noted")));
+      root.append(el("h2", { text: "What each view rests on" }), table("certainty-sections", ["View", "State", "Limits"], sections.map(([name, s]) => [SECTION_NAMES[name] || name, STATE_WORDS[s.status] || s.status, (s.limits || []).length])));
+      root.append(el("h2", { text: "What's always inferred" }), el("ul", { id: "certainty-inferred" },
+        el("li", { text: "Links between code come from names and imports, not from running it, so a call through a variable or a framework's magic can be missing." }),
+        el("li", { text: `The architecture, with ${edges.length} ${edges.length === 1 ? "link" : "links"}, is read from files such as Compose files, so check it against what you know.` }),
+        el("li", { text: `${inferredTables} ${inferredTables === 1 ? "table is" : "tables are"} known only from how code uses ${inferredTables === 1 ? "it" : "them"}, with no model or SQL file.` })));
+      const rows = sections.flatMap(([name, s]) => (s.limits || []).map((limit) => [SECTION_NAMES[name] || name, limit]));
+      root.append(el("h2", { text: "Everything it couldn't tell" }), rows.length ? table("certainty-limits", ["View", "Limit"], rows) : el("p", { class: "muted", text: "None noted." }));
+    });
+  };
+
   // ---------------------------------------------------------------- notebooks
   views.notebooks = async () => {
     page("Notebooks", "What each notebook does, in its own words, and how they feed each other. No cell was run.");

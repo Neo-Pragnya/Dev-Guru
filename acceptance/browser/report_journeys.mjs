@@ -141,7 +141,7 @@ await journey("nothing is fetched from the network", async () => {
 });
 await journey("every page of dev serve is in the file, works, and fetches nothing", async () => {
   const tabs = await evaluate(`[...document.querySelectorAll(".tab")].map((t) => t.dataset.view)`);
-  const want = ["overview", "codemap", "e2e", "data", "apis", "architecture", "quality", "coverage", "cves", "tokens", "code", "runs", "capabilities", "workflows", "documents", "learning"];
+  const want = ["overview", "codemap", "e2e", "data", "apis", "architecture", "quality", "coverage", "cves", "findings", "certainty", "tokens", "code", "runs", "capabilities", "workflows", "documents", "learning"];
   if (!tabs.includes("overview")) { // a public report keeps counts alone
     if (!tabs.includes("repository")) return "this report has no analysis";
     await evaluate(`document.querySelector('.tab[data-view="repository"]').click()`);
@@ -171,6 +171,8 @@ await journey("every page of dev serve is in the file, works, and fetches nothin
     await look("apis", `doc.querySelector("#main").textContent.includes("/churn/{customer_id}")`, "a route written in a notebook isn't listed");
     await look("cves", `doc.querySelectorAll("#cve-list tbody tr").length > 0`, "no CVEs with fixes");
     expect(await inner(`(() => { const h = doc.querySelector("#cve-list th"); return h.getBoundingClientRect().height < 40; })()`), "the CVE table's headings break up");
+    await look("findings", `doc.querySelector("#findings-list tbody tr td")?.textContent === "critical" && doc.querySelector("#findings-first").textContent.includes("test_refund")`, "the findings aren't shown");
+    await look("certainty", `doc.querySelector("#certainty-limits tbody tr") !== null`, "no limits are listed");
     await look("architecture", `doc.querySelectorAll("#calm-diagram path.rel").length >= 3`, "the architecture has no links");
     await look("notebooks", `doc.querySelector("#notebook-title")?.textContent.startsWith("Week 1") && doc.querySelector("#notebook-outline li") !== null`, "the first notebook isn't explained");
     await inner(`doc.querySelector("#notebook-next").click()`);
