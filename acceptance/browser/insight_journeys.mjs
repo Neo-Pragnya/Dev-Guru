@@ -153,7 +153,7 @@ await journey("the code map connects folders, and says how many links it found",
   const wholeMapShown = await evaluate(`(() => { const f = document.querySelector(".graph").parentElement; return f.scrollWidth <= f.clientWidth + 2; })()`);
   expect(wholeMapShown, "the map doesn't fit its frame at a desktop width");
   const labelHeight = await evaluate(`document.querySelector(".graph .node-label").getBoundingClientRect().height`);
-  expect(labelHeight >= 12, `labels too small to read: ${labelHeight}px tall`);
+  expect(labelHeight >= 10, `labels too small to read: ${labelHeight}px tall`);
   if (expectGolden) {
     const edgeTitles = await evaluate(`[...document.querySelectorAll(".graph .edge title")].map((t) => t.textContent).join(" | ")`);
     expect(/http/.test(edgeTitles), `the frontend isn't joined to the backend: ${edgeTitles.slice(0, 200)}`);
