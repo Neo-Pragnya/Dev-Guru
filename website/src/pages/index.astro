@@ -11,6 +11,9 @@ const titleOf = (id: string) =>
   byId.get(id)?.data.title ?? DOC_TITLES[id] ?? (id.split("/").at(-1) ?? id).replace(/[-_]/g, " ");
 const href = (h: string) => (/^https?:/.test(h) ? h : `${base}${h.replace(/^\//, "")}`);
 const demo = `${base}demo/dev-guru-explorer.html`;
+// The released version, read from the package so the chip always matches what pip installs.
+const versionFile = await import("../../../src/dev_guru/version.py?raw");
+const version = /__version__\s*=\s*"([^"]+)"/.exec(versionFile.default)?.[1] ?? "";
 const views = [
   { id: "constellation", q: "What's here?", title: "Constellation", text: "A 3D force-directed graph of every file: orbit it, pull a file, watch the imports glow." },
   { id: "flow", q: "What depends on what?", title: "Flow", text: "Entry side to foundations, by package or file. Cycles glow rose." },
@@ -18,6 +21,17 @@ const views = [
   { id: "calls", q: "Who calls in, what goes out?", title: "Calls", text: "A symbol-level ego network around any file." },
   { id: "hotspots", q: "Where is change expensive?", title: "Hotspots", text: "Big files many others depend on, at a glance." },
   { id: "tour", q: "Show me around", title: "Tour", text: "A narrated walk: packages, entry points, cycles, limits." },
+  { id: "overview", q: "What's in here?", title: "Overview", text: "One line for every view of the repository, with what's still unknown." },
+  { id: "codemap", q: "How does it connect?", title: "Code map", text: "Folders, files and functions, joined across folders. Select anything for its impact and a path." },
+  { id: "e2e", q: "What happens on a request?", title: "End-to-end flows", text: "From a frontend call, through the route, to the tables, a step at a time." },
+  { id: "notebooks", q: "What do these notebooks do?", title: "Notebooks", text: "Each one explained from its own words, what it writes, and how they feed each other." },
+  { id: "data", q: "What's in the database?", title: "Data", text: "An ERD of tables, fields and keys, and which code reads and writes each." },
+  { id: "apis", q: "What are the routes?", title: "API pathways", text: "Every route, who calls it, and calls that lead nowhere." },
+  { id: "architecture", q: "What's the shape of it?", title: "Architecture", text: "A CALM model inferred from the repository, marked as inferred, to download." },
+  { id: "quality", q: "Where's the risk?", title: "Quality", text: "Complexity, size, hotspots and tests, measured from the source." },
+  { id: "coverage", q: "What do tests cover?", title: "Coverage", text: "From a report your tests produced. Without one, it says so rather than show 0%." },
+  { id: "cves", q: "Is anything vulnerable?", title: "CVEs", text: "Known vulnerabilities and what fixes them. Unchecked never reads as clean." },
+  { id: "tokens", q: "How do I save tokens?", title: "Saving tokens", text: "A small map of the repository for an AI assistant, and which tool answers what." },
 ];
 ---
 
@@ -34,12 +48,15 @@ const views = [
       <div class="hero-actions" data-reveal style="--d: .15s">
         {site.ctas.map((c, i) => (<a class:list={["btn", { ghost: i > 0 }]} data-magnetic href={href(c.href)}>{c.label}</a>))}
       </div>
-      <div class="install-line" data-reveal style="--d: .2s"><span>$ {site.install}</span></div>
+      <div class="install-row" data-reveal style="--d: .2s">
+        <div class="install-line"><span>$ {site.install}</span></div>
+        <a class="pypi-chip" href="https://pypi.org/project/dev-guru/" data-magnetic><span>PyPI</span><strong>v{version}</strong></a>
+      </div>
     </div>
     <div data-reveal style="--d: .12s">
       <div class="window">
         <div class="window-bar"><i></i><i></i><i></i><span>dev explore . -o explorer.html</span><a href={demo} target="_blank" rel="noopener">Open full screen ↗</a></div>
-        <iframe src={`${demo}#view=constellation&embed=1`} title="Live Dev Guru explorer of Dev Guru's own code" loading="lazy"></iframe>
+        <iframe src={`${demo}#view=constellation&embed=1`} title="Live Dev Guru report on an example shop" loading="lazy"></iframe>
       </div>
       <p class="window-caption">Live: Dev Guru exploring its own source. Drag, zoom, hover, press <kbd>/</kbd> to search.</p>
     </div>
@@ -54,7 +71,7 @@ const views = [
   )}
 
   <h2 data-reveal>Six ways to see your code</h2>
-  <p class="section-lede" data-reveal>Every report holds all six views over the same data. Each card opens that view of the live demo.</p>
+  <p class="section-lede" data-reveal>Every report holds all of these over the same data, in one file. Each card opens that view of the live demo.</p>
   <div class="views">
     {views.map((v, i) => (
       <a class="view-card" href={`${demo}#view=${v.id}`} target="_blank" rel="noopener" data-reveal style={`--d:${i * 0.04}s`}>

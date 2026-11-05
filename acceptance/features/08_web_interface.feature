@@ -89,6 +89,6 @@ Feature: The web interface is complete in what ships, and the run console holds 
       no ERD line runs through a table
       the architecture is drawn from the inferred model
       CVEs say they haven't been checked
-      all 14 journeys passed
+      journeys passed
       """
 

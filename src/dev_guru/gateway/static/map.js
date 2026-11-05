@@ -195,6 +195,9 @@
     }
   }
 
+  window.DevGuru.drawGraph = drawGraph;
+  window.DevGuru.panZoom = panZoom;
+
   views.map = async (main, query) => {
     page("Code map", "How this repository connects. Open a folder to see its files, and a file to see its functions.");
     const root = document.querySelector("#main");
@@ -294,6 +297,49 @@
         }
         select(node);
       };
+      // What depends on this, directly or through something else, and how two things connect. Only what this view shows.
+      const impactAndPath = (node, label) => {
+        const users = new Map();
+        for (const e of edges) (users.get(e.target) || users.set(e.target, []).get(e.target)).push(e.source);
+        const affected = new Set();
+        const queue = [node.id];
+        while (queue.length) {
+          for (const user of users.get(queue.shift()) || []) {
+            if (user !== node.id && !affected.has(user)) { affected.add(user); queue.push(user); }
+          }
+        }
+        const route = (from, to) => {
+          const before = new Map([[from, null]]);
+          const waiting = [from];
+          while (waiting.length) {
+            const at = waiting.shift();
+            if (at === to) break;
+            for (const e of edges) {
+              if (e.source === at && !before.has(e.target)) { before.set(e.target, at); waiting.push(e.target); }
+            }
+          }
+          if (!before.has(to)) return null;
+          const steps = [];
+          for (let at = to; at !== null; at = before.get(at)) steps.unshift(at);
+          return steps;
+        };
+        const result = el("div", { id: "map-path" });
+        const others = connected.filter((n) => n.id !== node.id);
+        const picker = el("select", { id: "map-path-to", "aria-label": "Find a path to", on: { change: () => {
+          const target = picker.value;
+          if (!target) { result.replaceChildren(); return; }
+          const steps = route(node.id, target) || route(target, node.id);
+          if (!steps) { result.replaceChildren(el("p", { class: "muted", text: "No path between these in this view." })); graph.highlight(new Set([node.id, target])); return; }
+          result.replaceChildren(el("ol", {}, ...steps.map((id) => el("li", { text: label(id) }))));
+          graph.highlight(new Set(steps));
+        } } }, el("option", { value: "", text: "Find a path to..." }), ...others.map((n) => el("option", { value: n.id, text: n.label })));
+        return [
+          el("h3", { text: "Impact" }),
+          el("p", { id: "map-impact-count", text: affected.size ? `Changing this could affect ${affected.size} other ${affected.size === 1 ? "item" : "items"} in this view, directly or through others.` : "Nothing in this view depends on it." }),
+          ...(affected.size ? [el("button", { type: "button", class: "ghost", id: "map-impact", text: "Show them", on: { click: () => graph.highlight(new Set([node.id, ...affected])) } })] : []),
+          el("h3", { text: "Path" }), picker, result,
+        ];
+      };
       const select = (node) => {
         const incoming = edges.filter((e) => e.target === node.id);
         const outgoing = edges.filter((e) => e.source === node.id);
@@ -305,6 +351,7 @@
           ...list(`Used by (${incoming.length})`, incoming.map((e) => `${label(e.source)}: ${e.kindLabel}`)),
           ...list(`Uses (${outgoing.length})`, outgoing.map((e) => `${label(e.target)}: ${e.kindLabel}`)));
         if (!incoming.length && !outgoing.length) inspector.append(el("p", { class: "muted", text: "Nothing in this view connects to it." }));
+        else inspector.append(...impactAndPath(node, label));
         if (node.kind === "directory" || node.kind === "file") {
           inspector.append(el("button", { type: "button", id: "map-open-selected", text: `Open ${node.label}`, on: { click: () => open(node) } }));
         }

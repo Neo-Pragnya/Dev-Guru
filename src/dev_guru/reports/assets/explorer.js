@@ -785,18 +785,99 @@
     hotspots: { icon: "▦", label: "Hotspots", desc: "Big files that many others depend on are where changes cost the most.", draw: drawHotspots },
     tour: { icon: "☄", label: "Tour", desc: "A guided walk through this codebase.", draw: () => runTour(state.tour) },
   };
+  const SERVE = JSON.parse(document.getElementById("dg-serve").textContent);
+  const SHELL = JSON.parse(document.getElementById("dg-serve-shell").textContent);
+  const frame = document.getElementById("serveFrame");
+  const SERVE_VIEWS = {
+    overview: ["#/", "◇", "Overview", "What's connected, and a line for each view of this repository."],
+    codemap: ["#/map", "⌗", "Code map", "How the folders, files and functions connect, across folders."],
+    e2e: ["#/flows", "⇢", "End-to-end flows", "From a request to the data, one step at a time."],
+    notebooks: ["#/notebooks", "✎", "Notebooks", "What each notebook does, and how they feed each other."],
+    data: ["#/data", "⛁", "Data", "An ERD of tables and fields, and the code that uses them."],
+    apis: ["#/apis", "⇄", "API pathways", "Every route, who calls it, and calls that lead nowhere."],
+    architecture: ["#/architecture", "▣", "Architecture", "A CALM model inferred from the repository."],
+    quality: ["#/quality", "◈", "Quality", "Complexity, size and tests."],
+    coverage: ["#/coverage", "▤", "Coverage", "What the tests cover, per file."],
+    cves: ["#/cves", "⚠", "CVEs", "Known vulnerabilities in dependencies, and what fixes them."],
+    tokens: ["#/context", "✂", "Saving tokens", "A small map of this repository for an AI assistant."],
+    code: ["#/code", "⌘", "Code", "Browse the code graph by folder, file or symbol."],
+    runs: ["#/runs", "▶", "Runs", "What ran to make this report."],
+    capabilities: ["#/sources", "❖", "Capabilities", "What your sources offer."],
+  };
+  if (SERVE) {
+    window.DEV_GURU_REPORT = SERVE;
+    const hasNotebooks = (SERVE.intel.sections?.notebooks?.notebooks || []).length > 0;
+    for (const [id, [route, icon, label, desc]] of Object.entries(SERVE_VIEWS)) {
+      if (id === "notebooks" && !hasNotebooks) continue;
+      VIEWS[id] = { icon, label, desc, serve: route, draw: () => {} };
+    }
+  }
+  let frameReady = false;
+  const frameTheme = () => { try { frame.contentDocument.documentElement.dataset.theme = document.documentElement.dataset.theme === "day" ? "light" : "dark"; } catch { /* not loaded yet */ } };
+  function openServe(route) {
+    if (frameReady) { frameTheme(); frame.contentWindow.location.hash = route; return; }
+    if (frame.srcdoc) { frame.dataset.next = route; return; }
+    frame.dataset.next = route;
+    frame.addEventListener("load", () => {
+      frameReady = true;
+      frameTheme();
+      frame.contentWindow.location.hash = frame.dataset.next;
+      // a link inside a page moves to another view, so the tabs follow it
+      frame.contentWindow.addEventListener("hashchange", () => {
+        const section = `#/${frame.contentWindow.location.hash.replace(/^#\/?/, "").split(/[/?]/)[0]}`;
+        const found = Object.entries(VIEWS).find(([, v]) => v.serve === section);
+        if (found && state.view !== found[0]) { state.view = found[0]; markTabs(found[0]); $("#viewTitle").textContent = found[1].label; syncHash(); }
+      });
+    }, { once: true });
+    frame.srcdoc = SHELL;
+  }
+  if (D.repository && !SERVE) VIEWS.repository = { icon: "▤", label: "Repository", desc: "Every section of the repository analysis: components, routes, tables, flows, quality, coverage and vulnerabilities.", draw: drawRepository };
+  function drawRepository() {
+    const R = D.repository, box = $("#repoView");
+    const table = (id, heads, rows) => el("table", { id }, el("thead", {}, el("tr", {}, ...heads.map((h) => el("th", { text: h })))),
+      el("tbody", {}, ...rows.map((r) => el("tr", {}, ...r.map((c) => el("td", { text: c === null || c === undefined ? "" : String(c) }))))));
+    const part = (title, heads, rows, id, empty) => [el("h2", { text: title }), rows.length ? table(id, heads, rows) : el("p", { class: "muted", text: empty })];
+    const card = (value, label) => el("div", {}, el("b", { text: value === null || value === undefined ? "Unknown" : String(value) }), label);
+    const t = R.totals || {}, cov = R.coverage || {}, deps = R.dependencies || {};
+    const covered = typeof cov.line_rate === "number" ? `${Math.round(cov.line_rate * 100)}%` : "Unknown";
+    const held = R.reduced ? "Left out of a public report." : "None found in this analysis.";
+    const vulns = deps.vulnerabilities === null || deps.vulnerabilities === undefined
+      ? [el("h2", { text: "Vulnerabilities" }), el("p", { id: "repo-cves-unknown", text: R.reduced ? "Left out of a public report." : "Not checked, which doesn't mean there are none. A report makes no network requests. Run dev serve and ask for a check." })]
+      : part("Vulnerabilities", ["Package", "Version", "Severity", "Advisory", "Fixed in"], deps.vulnerabilities, "repo-cves", "None known, as of this analysis.");
+    box.replaceChildren(
+      el("div", { class: "repo-cards", id: "repo-cards" }, card(R.files, "Files"), card(R.loc, "Lines"), card(R.routes_total, "Routes"), card(R.tables_total, "Tables"), card(R.flows_total, "Flows"), card(t.avg_complexity, "Average complexity"), card(covered, "Line coverage")),
+      ...part("Components", ["Name", "Kind", "Language", "Files"], R.components, "repo-components", held),
+      ...part("How they connect (inferred)", ["From", "To", "How", "Evidence"], R.links, "repo-links", held),
+      ...part("Routes", ["Method", "Path", "Handler", "Called from"], R.routes, "repo-routes", held),
+      ...(R.unmatched.length ? part("Calls to routes that don't exist here", ["Method", "Path", "From"], R.unmatched, "repo-unmatched", "") : []),
+      ...part("Tables", ["Table", "Fields"], R.tables, "repo-tables", held),
+      ...part("Relationships", ["From", "To"], R.relationships, "repo-relationships", held),
+      ...part("End-to-end flows", ["Flow"], R.flows.map((f) => [f]), "repo-flows", held),
+      ...part("Most complex functions", ["Function", "Complexity", "Where"], R.hotspots, "repo-hotspots", held),
+      ...vulns);
+  }
   const tabs = $("#tabs");
-  for (const [id, v] of Object.entries(VIEWS)) tabs.append(el("button", { class: "tab", role: "tab", "data-view": id, "aria-selected": "false", onclick: () => { if (id !== "tour") { clearTimeout(tourTimer); $("#narration").hidden = true; } renderView(id); } }, el("span", { class: "ic", "aria-hidden": "true", text: v.icon }), v.label));
+  for (const [id, v] of Object.entries(VIEWS)) tabs.append(el("button", { class: `tab${id === "overview" ? " group-start" : ""}`, role: "tab", "data-view": id, "aria-selected": "false", onclick: () => { if (id !== "tour") { clearTimeout(tourTimer); $("#narration").hidden = true; } renderView(id); } }, el("span", { class: "ic", "aria-hidden": "true", text: v.icon }), v.label));
   function renderView(id, fromTour) {
     if (!VIEWS[id]) id = "constellation";
     if (!fromTour) state.view = id;
+    const served = VIEWS[id].serve;
+    document.querySelector(".workspace").hidden = !!served;
+    frame.hidden = !served;
+    if (served) {
+      space.active = false; cancelAnimationFrame(space.raf); space.raf = 0;
+      markTabs(id); document.title = `${VIEWS[id].label} · ${D.project?.name || "Dev Guru"}`;
+      openServe(served); syncHash();
+      return;
+    }
     if (id === "tour") { state.view = "tour"; markTabs("tour"); return VIEWS.tour.draw(); }
     markTabs(fromTour ? "tour" : id);
     $("#viewTitle").textContent = VIEWS[id].label;
     $("#viewDesc").textContent = VIEWS[id].desc;
     const tm = id === "hotspots", s3 = id === "constellation";
     if (!s3) { space.active = false; cancelAnimationFrame(space.raf); space.raf = 0; }
-    $("#treemap").hidden = !tm; cvs.hidden = !s3; svg.style.display = tm || s3 ? "none" : "block"; $("#zoomTools").hidden = tm;
+    const repo = id === "repository"; $("#repoView").hidden = !repo;
+    $("#treemap").hidden = !tm; cvs.hidden = !s3; svg.style.display = tm || s3 || repo ? "none" : "block"; $("#zoomTools").hidden = tm;
     toolsFor(id);
     $("#hint").textContent = "";
     VIEWS[id].draw();
@@ -991,7 +1072,7 @@
   }
   $("#about").addEventListener("click", (e) => { if (e.target.id === "about") $("#about").hidden = true; });
   $("#infoBtn").onclick = about;
-  function toggleTheme() { const r = document.documentElement; r.dataset.theme = r.dataset.theme === "day" ? "night" : "day"; space.theme = null; wake(); syncHash(); }
+  function toggleTheme() { const r = document.documentElement; r.dataset.theme = r.dataset.theme === "day" ? "night" : "day"; frameTheme(); space.theme = null; wake(); syncHash(); }
   $("#themeBtn").onclick = toggleTheme;
   function download(name, obj) {
     const a = el("a", { download: name, href: URL.createObjectURL(new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" })) });

@@ -71,3 +71,7 @@ code, .mono { font: 13px var(--mono); overflow-wrap: anywhere; }
   .brand { width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; transition: none !important; } }
+/* inside a report, the report's own tabs replace this shell */
+.in-report .top, .in-report nav, .in-report .skip { display: none; }
+.in-report .layout { display: block; }
+

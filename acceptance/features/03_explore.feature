@@ -37,7 +37,7 @@ Feature: dev explore turns a codebase into an interactive, offline report
       python -c 'print("closers", open("r.html").read().count("</" + "script>"))'
       """
     Then it succeeds
-    And the output contains "closers 3"
+    And the output contains "closers 5"
 
   @cap_report_safety
   Scenario: The report references nothing on the network

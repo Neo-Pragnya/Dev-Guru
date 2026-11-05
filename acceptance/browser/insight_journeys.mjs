@@ -168,6 +168,18 @@ await journey("the code map connects folders, and says how many links it found",
   }
   return `${r.nodes} nodes, ${r.edges} links`;
 });
+if (expectGolden) await journey("a node works from the keyboard, and shows its impact and a path to a table", async () => {
+  await route("#/map");
+  await sleep(300);
+  await evaluate(`[...document.querySelectorAll(".graph .node")].find((n) => n.querySelector(".node-label").textContent.endsWith("services")).focus()`);
+  await key("Enter", "Enter", 13);
+  await until(`!!document.querySelector("#map-impact-count")`, "the details to open");
+  const count = await text("#map-impact-count");
+  expect(/could affect \d+ other/.test(count), count);
+  const picked = await evaluate(`(() => { const p = document.querySelector("#map-path-to"); const o = [...p.options].find((x) => x.textContent === "orders"); p.value = o.value; p.dispatchEvent(new Event("change", { bubbles: true })); return o.textContent; })()`);
+  const steps = await evaluate(`[...document.querySelectorAll("#map-path li")].map((l) => l.textContent)`);
+  expect(steps.length >= 2 && steps[steps.length - 1] === picked, `no path to ${picked}: ${steps.join(" > ")}`);
+});
 if (expectGolden) await journey("opening a folder shows its files, joined across folders by real imports", async () => {
   await route("#/map?path=frontend");
   const labels = await evaluate(`[...document.querySelectorAll(".graph .node .node-label")].map((n) => n.textContent)`);
@@ -276,6 +288,12 @@ if (args.includes("--network")) await journey("checking for CVEs finds the known
   const list = await text("#cve-list");
   expect(/jinja2/i.test(list), `jinja2's known CVEs aren't listed: ${list.slice(0, 160)}`);
   expect(/\d+\.\d+/.test(list), "no fixed version is shown");
+});
+if (expectGolden) await journey("the overview summarises every section, and says what's unknown", async () => {
+  await route("#/");
+  await until(`!!document.querySelector("#overview-sections")`, "the summary");
+  const t = await text("#overview-sections");
+  for (const part of ["Code map", "End-to-end flows", "4 tables", "5 routes", "Architecture", "Quality", "Coverage", "CVEs"]) expect(t.includes(part), `missing ${part}: ${t}`);
 });
 await journey("saving tokens shows a small map and the tools", async () => {
   await route("#/context");

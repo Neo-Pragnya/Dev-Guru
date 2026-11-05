@@ -40,7 +40,7 @@ If you started `dev serve` with several folders, the picker at the top chooses b
 
 **Workflows**, **Quality**, **Documentation** and **Learning review** aren't in this version. They're in the navigation
 under that heading, and each names the commands that work today. See the
-[roadmap](https://github.com/Neo-Pragnya/Dev-Guru/blob/main/ROADMAP.md) for what's planned.
+[roadmap](../roadmap.md) for what's planned.
 
 ### Runs keep going without the page
 

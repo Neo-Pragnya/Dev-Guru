@@ -29,7 +29,7 @@ Open any of these pages and choose **Analyse this repository**. Analysis reads y
 
 ### Code map
 
-The map starts with folders and draws what links them: imports, calls, HTTP calls from a frontend to a backend route, and reads and writes to tables. Open a folder to see its files, and a file to see its functions. Select anything to see what uses it, with its source.
+The map starts with folders and draws what links them: imports, calls, HTTP calls from a frontend to a backend route, and reads and writes to tables. Open a folder to see its files, and a file to see its functions. Select anything to see what uses it, with its source, how many items in the view could be affected by changing it, and a path to anything else.
 
 It tells you what it left out: third-party imports aren't drawn, but are counted. Folders nothing links to are listed under **Not connected**, because they may be standalone scripts, or linked in a way the analysis can't read.
 

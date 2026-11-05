@@ -14,7 +14,7 @@ Feature: Dev Guru finds and checks the Ananke harness it runs on
     When I run "dev doctor"
     Then it succeeds
     And the output contains "ananke-plexus"
-    And the output contains "supported >=0.3.22,<0.4"
+    And the output contains "supported >=0.3.25,<0.4"
 
   @cap_cli_ux
   Scenario: An unsupported transport is refused, never silently swapped for another

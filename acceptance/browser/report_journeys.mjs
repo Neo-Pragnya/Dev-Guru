@@ -139,6 +139,52 @@ await journey("nothing is fetched from the network", async () => {
   expect(!outside.length, "requested: " + outside.slice(0, 3).join(", "));
   return `${requests.length} local loads only`;
 });
+await journey("every page of dev serve is in the file, works, and fetches nothing", async () => {
+  const tabs = await evaluate(`[...document.querySelectorAll(".tab")].map((t) => t.dataset.view)`);
+  const want = ["overview", "codemap", "e2e", "data", "apis", "architecture", "quality", "coverage", "cves", "tokens", "code", "runs", "capabilities"];
+  if (!tabs.includes("overview")) { // a public report keeps counts alone
+    if (!tabs.includes("repository")) return "this report has no analysis";
+    await evaluate(`document.querySelector('.tab[data-view="repository"]').click()`);
+    await sleep(200);
+    expect(await evaluate(`/Routes/.test(document.querySelector("#repo-cards")?.textContent || "") && !document.querySelector("#serveFrame").contentDocument?.body?.textContent`), "the public view isn't shown");
+    return "public: counts alone";
+  }
+  for (const id of want) expect(tabs.includes(id), `no ${id} tab`);
+  const inner = (expr) => evaluate(`(() => { const doc = document.querySelector("#serveFrame").contentDocument; return ${expr}; })()`);
+  const seen = [];
+  for (const id of tabs.filter((t) => want.includes(t) || t === "notebooks")) {
+    await evaluate(`document.querySelector('.tab[data-view="${id}"]').click()`);
+    await sleep(500);
+    const page = await inner(`({ title: doc.querySelector("#main h1")?.textContent, length: doc.querySelector("#main")?.textContent.length, alert: doc.querySelector('#main [role="alert"]')?.textContent, wide: doc.documentElement.scrollWidth > doc.documentElement.clientWidth + 2 })`);
+    expect(page.title && page.length > 100, `${id} is empty: ${JSON.stringify(page)}`);
+    expect(!page.alert, `${id} shows an error: ${page.alert}`);
+    expect(!page.wide, `${id} scrolls sideways`);
+    await shot(`tab-${id}`);
+    seen.push(id);
+  }
+  if (args.includes("--full")) {
+    const look = async (id, expr, what) => { await evaluate(`document.querySelector('.tab[data-view="${id}"]').click()`); await sleep(500); expect(await inner(expr), what); };
+    await look("codemap", `doc.querySelectorAll(".graph .edge").length > 5`, "the code map has no links");
+    await look("data", `doc.querySelectorAll(".table-card").length >= 4 && doc.querySelector("#main").textContent.includes("churn_scores")`, "the ERD is missing tables, including one written in a notebook");
+    const crossed = await inner(`(() => { const cards = [...doc.querySelectorAll(".table-card")].map((c) => c.getBoundingClientRect()); return [...doc.querySelectorAll("path.rel")].filter((line) => { const n = line.getTotalLength(); for (let i = 2; i < 19; i++) { const p = line.getPointAtLength((n * i) / 20).matrixTransform(line.getScreenCTM()); if (cards.some((c) => p.x > c.left + 2 && p.x < c.right - 2 && p.y > c.top + 2 && p.y < c.bottom - 2)) return true; } return false; }).length; })()`);
+    expect(crossed === 0, `${crossed} lines run through a table`);
+    await look("apis", `doc.querySelector("#main").textContent.includes("/churn/{customer_id}")`, "a route written in a notebook isn't listed");
+    await look("cves", `doc.querySelectorAll("#cve-list tbody tr").length > 0`, "no CVEs with fixes");
+    expect(await inner(`(() => { const h = doc.querySelector("#cve-list th"); return h.getBoundingClientRect().height < 40; })()`), "the CVE table's headings break up");
+    await look("architecture", `doc.querySelectorAll("#calm-diagram path.rel").length >= 3`, "the architecture has no links");
+    await look("notebooks", `doc.querySelector("#notebook-title")?.textContent.startsWith("Week 1") && doc.querySelector("#notebook-outline li") !== null`, "the first notebook isn't explained");
+    await inner(`doc.querySelector("#notebook-next").click()`);
+    await sleep(200);
+    expect(await inner(`doc.querySelector("#notebook-title").textContent.startsWith("Week 2") && doc.querySelector("#notebook-written").textContent.includes("churn/api.py") && doc.querySelector("#notebook-from, #notebook-to") !== null`), "the second notebook doesn't show what it writes");
+    await inner(`[...doc.querySelectorAll("#notebook-written button")].find((b) => b.textContent.endsWith("api.py")).click()`);
+    await sleep(200);
+    expect(await inner(`doc.querySelector("#notebook-source").textContent.includes("FastAPI")`), "written source isn't shown");
+    await evaluate(`document.querySelector('.tab[data-view="constellation"]').click()`);
+    await sleep(300);
+    expect(await evaluate(`document.querySelector("#serveFrame").hidden && !document.querySelector(".workspace").hidden`), "the explorer doesn't come back");
+  }
+  return `${seen.length} pages`;
+});
 await journey("a phone-width screen has no horizontal scroll", async () => {
   await viewport(390, 844, true); await go("", 1500);
   const w = await evaluate(`[document.documentElement.scrollWidth, window.innerWidth]`);
@@ -148,5 +194,6 @@ await journey("a phone-width screen has no horizontal scroll", async () => {
 });
 ws.close(); chrome.kill();
 const failed = results.filter((r) => !r.ok);
+
 console.log(failed.length ? `${failed.length} journey(s) failed` : `all ${results.length} journeys passed`);
 process.exit(failed.length ? 1 : 0);

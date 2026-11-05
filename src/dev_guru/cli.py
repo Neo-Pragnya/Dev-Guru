@@ -119,6 +119,13 @@ def explore(
             help="private (everything) or public (no source, docstrings or Git revision: safe to publish)"
         ),
     ] = "private",
+    check_vulnerabilities: Annotated[
+        bool,
+        typer.Option(
+            "--check-vulnerabilities",
+            help="Also look up dependencies at osv.dev. Sends package names and versions, and nothing else",
+        ),
+    ] = False,
     as_json: JsonOpt = False,
 ) -> None:
     """Explore a codebase: Ananke builds the graph, Dev Guru writes an interactive, offline HTML explorer.
@@ -128,7 +135,13 @@ def explore(
     """
     try:
         client = connect(transport)
-        result = service.explore(workspace, client=client, name=name, profile=profile)
+        result = service.explore(
+            workspace,
+            client=client,
+            name=name,
+            profile=profile,
+            check_vulnerabilities=check_vulnerabilities,
+        )
         page, sidecar = service.export_html(result, output, client=client)
     except errors.GuruError as exc:
         _fail(exc, as_json, 1)

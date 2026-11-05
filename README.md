@@ -68,7 +68,7 @@ survive a reload or a lost connection, and stop only when you press Cancel), bro
 capabilities. It listens only on your computer, only the link it prints gets in, and it needs no Node: everything comes
 from the [Dev Guru package on PyPI](https://pypi.org/project/dev-guru/). See [The local gateway](docs/guides/gateway.md).
 
-What's coming next, including code maps, flows, ERDs and CVE views, is in the [roadmap](ROADMAP.md).
+What's released and what's coming next is in the [roadmap](docs/roadmap.md).
 
 ## How it fits together
 

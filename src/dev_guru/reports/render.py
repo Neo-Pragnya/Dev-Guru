@@ -31,7 +31,7 @@ from typing import Any
 from dev_guru.version import __version__
 
 RENDERER = "dev-guru/explorer-html@1"
-PLACEHOLDER = re.compile(r"\{\{(TITLE|CSS|JS|DATA|MANIFEST)\}\}")
+PLACEHOLDER = re.compile(r"\{\{(TITLE|CSS|JS|DATA|MANIFEST|SERVE_DATA|SERVE_SHELL)\}\}")
 LS, PS = (
     chr(0x2028),
     chr(0x2029),
@@ -52,6 +52,10 @@ def safe_json(data: Any) -> str:
 
 
 def digest(data: Any) -> str:
+    if isinstance(data, dict):
+        # The digest covers the code. The analysis counts every file, so a report left in the folder would change it,
+        # and its recording holds run ids and times.
+        data = {k: v for k, v in data.items() if k not in {"serve", "repository"}}
     canonical = json.dumps(data, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
@@ -103,16 +107,35 @@ def _asset(name: str) -> str:
     return resources.files("dev_guru.reports").joinpath("assets", name).read_text(encoding="utf-8")
 
 
+def _serve_shell() -> str:
+    """The pages of ``dev serve``, as one document for a frame in the report. A recording answers their requests."""
+    static = Path(__file__).resolve().parent.parent / "gateway" / "static"
+    text = (static / "index.html").read_text(encoding="utf-8")
+    text = re.sub(r"<link rel=\"icon\"[^>]*>\n?", "", text)
+    for name in ("app.css", "map.css", "insights.css"):
+        link = f'<link rel="stylesheet" href="/{name}">'
+        text = text.replace(link, f"<style>{(static / name).read_text(encoding='utf-8')}</style>")
+    host = (static / "static_host.js").read_text(encoding="utf-8")
+    scripts = f"<script>{host}</script>"
+    for name in ("app.js", "map.js", "insights.js"):
+        text = text.replace(f'<script src="/{name}" defer></script>', "")
+        scripts += f"<script>{(static / name).read_text(encoding='utf-8')}</script>"
+    return text.replace("</body>", f"{scripts}</body>")
+
+
 def render(
     model: dict[str, Any], report_manifest: dict[str, Any], *, title: str | None = None
 ) -> str:
     page = _asset("explorer.html")
     name = title or f"{model['project']['name']} · Dev Guru explorer"
+    serve = model.get("serve")
     values = {
+        "SERVE_DATA": safe_json(serve) if serve else "null",
+        "SERVE_SHELL": safe_json(_serve_shell()) if serve else "null",
         "TITLE": html.escape(name),
         "CSS": _asset("explorer.css"),
         "JS": _asset("explorer.js"),
-        "DATA": safe_json(model),
+        "DATA": safe_json({k: v for k, v in model.items() if k != "serve"}),
         "MANIFEST": safe_json(report_manifest),
     }
     # One pass over the template only: inserted content (source code may itself contain "{{MANIFEST}}")

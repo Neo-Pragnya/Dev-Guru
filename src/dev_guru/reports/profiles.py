@@ -37,6 +37,11 @@ def apply(
         sym["signature"] = _STRING.sub("'…'", str(sym.get("signature", "")))
     for f in model.get("files", []):
         f["doc"] = ""
+    model.pop("serve", None)  # source, routes and tables: everything public leaves out
+    if model.get("repository"):
+        from dev_guru.reports.repository import public
+
+        model["repository"] = public(model["repository"])
     model["limitations"] = [*model.get("limitations", []), PUBLIC_NOTE]
     manifest["limitations"] = model["limitations"]
     manifest["workspace"] = {"name": manifest.get("workspace", {}).get("name", "")}

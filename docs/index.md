@@ -39,4 +39,4 @@ Dev Guru is on PyPI as [`dev-guru`](https://pypi.org/project/dev-guru/).
 - [Python SDK](guides/sdk.md): use Dev Guru from scripts and notebooks.
 - [How it fits together](concepts/architecture.md): Dev Guru, Ananke Plexus and Dex Trove.
 - [Report safety](concepts/report-safety.md): why a report can't run code or phone home.
-- [Roadmap](https://github.com/Neo-Pragnya/Dev-Guru/blob/main/ROADMAP.md): what's released and what's planned.
+- [Roadmap](roadmap.md): what's released and what's planned.
