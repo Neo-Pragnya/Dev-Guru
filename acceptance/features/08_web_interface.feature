@@ -92,3 +92,24 @@ Feature: The web interface is complete in what ships, and the run console holds 
       journeys passed
       """
 
+  @cap_web_shell
+  Scenario: Swimlanes and BPMN come from a reviewed process, and a file edited elsewhere reads back
+    Given an empty directory
+    And the file "process.md" with content:
+      """
+      # Orders
+
+      1. Sales: Receive the order
+      2. Finance: Is the credit good?
+         - Yes: go to step 3
+         - No: end
+      3. Warehouse: Ship it
+      """
+    When I run "git init -q . && dev bpmn process.md --xml process.bpmn --svg process.svg"
+    Then it succeeds
+    And the output contains "3 lanes"
+    And the file "process.process.html" contains "Warehouse"
+    When I run "dev bpmn process.bpmn -o again.html"
+    Then it succeeds
+    And the file "again.html" contains "Warehouse"
+

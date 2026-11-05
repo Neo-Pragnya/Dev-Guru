@@ -364,6 +364,50 @@ def context(
 
 
 @app.command()
+def bpmn(
+    document: Annotated[
+        Path, typer.Argument(help="A Markdown process, or a .bpmn file to read back")
+    ],
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", "-o", help="Viewer page (default <document>.process.html)"),
+    ] = None,
+    xml: Annotated[Path | None, typer.Option("--xml", help="Also write BPMN 2.0 XML here")] = None,
+    svg: Annotated[
+        Path | None, typer.Option("--svg", help="Also write the swimlane drawing here")
+    ] = None,
+    workspace: Annotated[Path, typer.Option("--workspace", "-w")] = Path("."),
+    transport: TransportOpt = "in-process",
+) -> None:
+    """Swimlanes and BPMN from a reviewed process. Ananke reads it, nothing is guessed, and nothing runs."""
+    from dev_guru import bpmn as drawing
+
+    try:
+        text = document.read_text(encoding="utf-8")
+        client = connect(transport)
+        if document.suffix.lower() == ".bpmn":
+            answer = client.process_model(workspace, "", document.name, text)
+        else:
+            answer = client.process_model(workspace, text, document.name)
+    except (errors.GuruError, OSError, UnicodeDecodeError) as exc:
+        code = getattr(exc, "code", errors.INVALID_INPUT)
+        typer.echo(f"error: {getattr(exc, 'message', exc)} ({code})", err=True)
+        raise typer.Exit(2) from exc
+    model = answer["model"]
+    page = output or document.with_suffix(".process.html")
+    page.write_text(drawing.viewer(model, answer["bpmn"]), encoding="utf-8")
+    if xml:
+        xml.write_text(answer["bpmn"], encoding="utf-8")
+    if svg:
+        svg.write_text(drawing.render(model), encoding="utf-8")
+    typer.echo(f"Wrote {page}: {len(model['lanes'])} lanes and {len(model['nodes'])} steps")
+    for problem in model["problems"]:
+        typer.echo(f"problem: {problem}", err=True)
+    if model["problems"]:
+        raise typer.Exit(1)
+
+
+@app.command()
 def diagram(
     document: Annotated[Path, typer.Argument(help="An approved Markdown document")],
     output: Annotated[

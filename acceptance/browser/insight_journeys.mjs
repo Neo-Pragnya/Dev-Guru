@@ -28,6 +28,14 @@ function buildWorkspace(root) {
   // old pins on purpose, for known CVE answers, kept out of the repository as manifests so no scanner mistakes them for ours
   if (!args.includes("--repo")) for (const f of ["backend/requirements.txt", "frontend/package.json"]) renameSync(join(root, `${f}.pins`), join(root, f));
   const git = (...a) => execFileSync("git", ["-C", root, ...a], { stdio: "ignore" });
+  if (!args.includes("--repo")) {
+    // a capability Ananke really knows, so a workflow can compile
+    const skill = join(root, "skills", "demo-step");
+    mkdirSync(skill, { recursive: true });
+    writeFileSync(join(skill, "SKILL.md"), "---\nname: demo-step\ndescription: A step for testing workflows.\nlicense: MIT\nversion: 1.0.0\n---\n\n# Demo\n");
+    execFileSync("ananke", ["registry", "init"], { cwd: root, stdio: "ignore" });
+    execFileSync("ananke", ["registry", "learn", "skills/demo-step", "--namespace", "demo"], { cwd: root, stdio: "ignore" });
+  }
   git("init", "-q"); git("add", "-A"); git("-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-qm", "init");
 }
 
@@ -310,6 +318,56 @@ await journey("a workflow draft is built by keyboard-friendly form, and Ananke's
   const runs = await evaluate(`fetch("/api/v1/runs?workspace=" + encodeURIComponent(document.querySelector("#workspace").value)).then((r) => r.json()).then((d) => d.runs.filter((x) => x.kind === "workflow.run").length)`);
   expect(runs === 0, "a preview started something");
 });
+if (expectGolden) await journey("the canvas works from the keyboard, keeps types honest, and shares one draft with the form", async () => {
+  await route("#/workflows");
+  await evaluate(`(() => { const p = document.querySelector("#workflow-preset"); p.value = "review"; p.dispatchEvent(new Event("change", { bubbles: true })); for (const c of document.querySelectorAll(".step-capability")) { c.value = "demo/demo-step@1.0.0"; c.dispatchEvent(new Event("input", { bubbles: true })); } document.querySelector("#workflow-mode-canvas").click(); })()`);
+  await sleep(100);
+  expect((await evaluate(`document.querySelectorAll("#workflow-canvas .workflow-node").length`)) === 2, "the canvas has no steps");
+  expect((await evaluate(`document.querySelectorAll("#workflow-canvas .workflow-edge").length`)) === 1, "the form's link isn't drawn");
+  // arrow keys move a step, and nothing Ananke sees changes
+  const hash = async () => { await evaluate(`document.querySelector("#workflow-preview").click()`); await until(`!!document.querySelector("#workflow-hash") || !!document.querySelector("#workflow-issues")`, "the preview"); expect(!(await evaluate(`!!document.querySelector("#workflow-issues")`)), `problems: ${await text("#workflow-issues")}`); return text("#workflow-hash"); };
+  const first = await hash();
+  await evaluate(`document.querySelector('[data-id="plan"]').focus()`);
+  const before = await evaluate(`document.querySelector('[data-id="plan"]').getAttribute("transform")`);
+  await key("ArrowRight", "ArrowRight", 39);
+  const after = await evaluate(`document.querySelector('[data-id="plan"]').getAttribute("transform")`);
+  expect(before !== after, "the arrow key didn't move it");
+  expect(await evaluate(`document.activeElement?.dataset?.id === "plan"`), "focus was lost");
+  await evaluate(`document.querySelector("#workflow-result").replaceChildren()`);
+  expect((await hash()) === first, "moving a step changed the plan");
+  // a link of the wrong type is refused, and says why
+  await evaluate(`(() => { document.querySelector("#workflow-mode-form").click(); const o = document.querySelectorAll(".step-outputs")[1]; o.value = "findings:json/v1"; o.dispatchEvent(new Event("change", { bubbles: true })); document.querySelector("#workflow-mode-canvas").click(); })()`);
+  await evaluate(`document.querySelector('[data-port="out:review:findings"]').focus()`);
+  await key("Enter", "Enter", 13);
+  await evaluate(`document.querySelector('[data-port="in:review:plan"]').dispatchEvent(new MouseEvent("click", { bubbles: true }))`);
+  expect(/can't take its own output/.test(await text("#workflow-status")), await text("#workflow-status"));
+  await evaluate(`(() => { document.querySelector("#workflow-mode-form").click(); const i = document.querySelectorAll(".step-inputs")[1]; i.value = "plan:json/v1"; i.dispatchEvent(new Event("change", { bubbles: true })); document.querySelector("#workflow-mode-canvas").click(); })()`);
+  await evaluate(`document.querySelector('[data-port="out:plan:plan"]').dispatchEvent(new MouseEvent("click", { bubbles: true }))`);
+  await evaluate(`document.querySelector('[data-port="in:review:plan"]').dispatchEvent(new MouseEvent("click", { bubbles: true }))`);
+  expect(/don't fit/.test(await text("#workflow-status")), `a wrong type was linked: ${await text("#workflow-status")}`);
+  await evaluate(`(() => { document.querySelector("#workflow-mode-form").click(); const i = document.querySelectorAll(".step-inputs")[1]; i.value = "plan:markdown/v1"; i.dispatchEvent(new Event("change", { bubbles: true })); document.querySelector("#workflow-mode-canvas").click(); })()`);
+  await evaluate(`document.querySelector('[data-port="out:plan:plan"]').dispatchEvent(new MouseEvent("click", { bubbles: true }))`);
+  await evaluate(`document.querySelector('[data-port="in:review:plan"]').dispatchEvent(new MouseEvent("click", { bubbles: true }))`);
+  expect(/Connected plan.plan to review.plan/.test(await text("#workflow-status")), await text("#workflow-status"));
+  // export and import give the same plan, whatever the order
+  const exported = await evaluate(`new Promise((done) => { const real = URL.createObjectURL; URL.createObjectURL = (b) => { b.text().then(done); URL.createObjectURL = real; return real.call(URL, b); }; document.querySelector("#workflow-export").click(); })`);
+  const draft = JSON.parse(exported);
+  expect(!("layout" in draft) && !JSON.stringify(draft).includes("transform"), "where steps sit leaked into the draft");
+  await evaluate(`document.querySelector("#workflow-result").replaceChildren()`);
+  const second = await hash();
+  draft.nodes.reverse();
+  await evaluate(`(() => { const t = new DataTransfer(); t.items.add(new File([${JSON.stringify(JSON.stringify(draft))}], "d.json", { type: "application/json" })); const i = document.querySelector("#workflow-import"); i.files = t.files; i.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+  await sleep(200);
+  await evaluate(`document.querySelector("#workflow-result").replaceChildren()`);
+  expect((await hash()) === second, "export and import changed the plan");
+  for (const [w, h, mobile] of [[390, 844, true], [768, 1024, false], [1440, 900, false]]) {
+    await viewport(w, h, mobile);
+    await sleep(80);
+    expect(await evaluate(`document.documentElement.scrollWidth <= window.innerWidth + 1`), `sideways scroll at ${w}px`);
+    expect(await evaluate(`document.querySelector("#workflow-canvas").getBoundingClientRect().width > 0`), `no canvas at ${w}px`);
+  }
+  await shot("workflow-canvas");
+});
 await journey("a deck comes from a Markdown file, and a path out of the workspace is refused", async () => {
   expectedStatus = /status of (400|401|404|503)/;
   await route("#/docs");
@@ -323,7 +381,7 @@ await journey("a deck comes from a Markdown file, and a path out of the workspac
   })()`);
   expect(r.status === 400, `the escape got ${r.status}`);
   expect(r.listed.includes(".md"), r.listed);
-  await evaluate(`document.querySelector('#documents button').click()`);
+  await evaluate(`document.querySelector('#documents button[aria-label^="Make a deck"]').click()`);
   await until(`!!document.querySelector("#document-built") || !!document.querySelector('#document-result [role="alert"]')`, "the deck");
   expect(await evaluate(`!!document.querySelector("#document-built")`), `no deck: ${await text("#document-result")}`);
   expectedStatus = /status of (401|404|503)/;

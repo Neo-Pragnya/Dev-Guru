@@ -13,6 +13,7 @@ released.
 
 | Version | Highlights |
 | --- | --- |
+| **0.8.0** | A workflow canvas that works from the keyboard. Swimlanes and BPMN 2.0 from a reviewed process |
 | **0.7.0** | Workflows, Documentation and Learning review in the web interface, so nothing is marked as missing |
 | **0.6.0** | One offline file with every page of `dev serve`, and an example that shows them all. Folders of notebooks: code in `%%writefile` cells counts, and a Notebooks page explains each one. Impact and paths on the Code map |
 | **0.5.1** | The Architecture page lists differences from a declared model. A guide to mapping a new repository |
@@ -38,7 +39,7 @@ The rules they follow:
 
 ## Planned: going further in the web interface
 
-- **A drag-and-drop workflow canvas**, with the same draft format as the form, and running from the browser.
-- **BPMN process design**, from reviewed processes, with editable rendering.
+- **Running a workflow from the browser**, once a real agent backend has been tested end to end.
+- **Editing a process in the browser.** Today, you edit the text or use a BPMN tool, and read it back.
 - **Richer documents:** outlines by audience, and previewing in the page.
 

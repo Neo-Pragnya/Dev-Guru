@@ -258,6 +258,11 @@ class InProcessAnanke:
             for d in found
         ]
 
+    def process_model(
+        self, workspace: Path, text: str, source: str = "", bpmn: str = ""
+    ) -> dict[str, Any]:
+        return dict(self._call(workspace, lambda f: f.process_model(text, source, bpmn)))
+
     def learning_candidates(self, workspace: Path) -> list[str]:
         """Names of the candidates waiting for review."""
         self.require_compatible()

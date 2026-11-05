@@ -82,7 +82,8 @@ export const DOC_NAV: { section: string; items: string[]; shapes: string; tint: 
       "guides/sdk",
       "guides/gateway",
       "guides/repository-views",
-      "guides/notebooks"
+      "guides/notebooks",
+      "guides/business-processes"
     ],
     "shapes": "hex>flower8",
     "tint": "lemon"
@@ -122,6 +123,7 @@ export const DOC_TITLES: Record<string, string> = {
   "guides/gateway": "The local gateway",
   "guides/repository-views": "Repository views",
   "guides/notebooks": "Folders of notebooks",
+  "guides/business-processes": "Business processes",
   "roadmap": "Roadmap",
   "reference/cli": "CLI reference",
   "reference/report-format": "Report format"
@@ -166,12 +168,12 @@ export const STATS: { label: string; value: string; tint: string }[] = [
   },
   {
     "label": "Unit tests",
-    "value": "151",
+    "value": "154",
     "tint": "teal"
   },
   {
     "label": "Browser journeys per release",
-    "value": "51",
+    "value": "52",
     "tint": "lilac"
   }
 ];

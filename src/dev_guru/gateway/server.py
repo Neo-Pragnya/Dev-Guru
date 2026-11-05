@@ -396,7 +396,9 @@ class _Handler(BaseHTTPRequestHandler):
         elif path == "/api/v1/documents/build":
             try:
                 self._json(
-                    documents.build(root, str(body.get("path", "")), str(body.get("what", "")))
+                    documents.build(
+                        root, str(body.get("path", "")), str(body.get("what", "")), client
+                    )
                 )
             except documents.DocumentError as exc:
                 raise _Reject(400, exc.code, str(exc)) from exc
