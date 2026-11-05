@@ -1,4 +1,0 @@
-# The test fixture pins old packages on purpose, so the CVE page has known answers to test.
-scan:
-  skip-dirs:
-    - acceptance/fixtures/shop

@@ -47,7 +47,7 @@ A table only known because code uses it is counted separately as **Known only fr
 
 ### Architecture
 
-The components, drawn so what depends on what reads left to right, with the evidence for each link. This is inferred from files such as `docker-compose.yml`, and the page says so, so check it against what you know. **Download CALM model** saves it in the [CALM](https://calm.finos.org/) format.
+The components, drawn so what depends on what reads left to right, with the evidence for each link. This is inferred from files such as `docker-compose.yml`, and the page says so, so check it against what you know. If you've declared a model at `.ananke/architecture/system.calm.json`, the page lists what differs. **Download CALM model** saves it in the [CALM](https://calm.finos.org/) format.
 
 The diagram shows components that take part in links. The table lists all of them, including notebooks and tests.
 
@@ -67,6 +67,15 @@ dev context ../shop
 ```
 
 To have an assistant use these by default, see [Saving tokens](https://github.com/Neo-Pragnya/Ananke-Plexus/blob/main/docs/guides/saving-tokens.md) in Ananke's guide.
+
+## Mapping a new repository
+
+1. **Start with the Overview and Code map.** Check the components and folders look right. A folder under **Not connected** that should be connected is the first thing to look into.
+2. **Check one flow you know.** Choose a route whose path through the code you can check by hand. If it's right, trust the others more. If a step's missing, the page's limits usually say why.
+3. **Check the broken calls.** Calls to routes that don't exist here are either bugs, or a service in another repository.
+4. **Compare the Data page with your schema.** Tables **Known only from use** have no model or SQL file here.
+5. **Save what you confirm as a declared architecture.** Put your model at `.ananke/architecture/system.calm.json`, and the Architecture page shows how the code differs from it each time you analyse.
+6. **Produce a coverage report and ask for a CVE check.** Both stay marked as unknown until you do.
 
 ## Limits
 

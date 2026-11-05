@@ -37,7 +37,7 @@ jobs:
       published: ${{ steps.testpypi.outputs.published }}
     steps:
       - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
 
@@ -69,7 +69,7 @@ jobs:
         run: uv run --with twine twine check dist/*
 
       - name: Upload dist artifacts
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: testpypi-dist-${{ github.ref_name }}
           path: dist/
@@ -84,7 +84,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
 
@@ -125,13 +125,13 @@ jobs:
       attestations: write
     steps:
       - name: Download dist
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: testpypi-dist-${{ github.ref_name }}
           path: dist/
 
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be
         with:
           subject-path: "dist/*"
 
@@ -147,7 +147,7 @@ jobs:
       contents: read
     steps:
       - name: Download exact dist artifacts from build step
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: testpypi-dist-${{ github.ref_name }}
           path: dist/

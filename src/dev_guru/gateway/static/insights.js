@@ -267,7 +267,17 @@
         el("div", { class: "row" }, el("button", { type: "button", class: "ghost", id: "download-calm", text: "Download CALM model", on: { click: () => download("system.calm.json", JSON.stringify(model, null, 2), "application/json") } })),
         el("h2", { text: "How they connect" }),
         relations.length ? table("calm-links", ["From", "To", "How", "Evidence"], relations.map((r) => [r.source, r.target, r.type, r.evidence])) : el("p", { class: "muted", text: "No links between components were found." }));
-      if (calm.drift) root.append(el("h2", { text: "Differences from the declared model" }), el("pre", { class: "source" }, el("code", { text: JSON.stringify(calm.drift, null, 1) })));
+      if (calm.drift) {
+        const pair = (p) => `${p[0]} to ${p[1]}`;
+        const rows = [
+          ...(calm.drift.components_only_declared || []).map((c) => ["Component", c, "Declared, but not found in the code"]),
+          ...(calm.drift.components_only_inferred || []).map((c) => ["Component", c, "Found in the code, but not declared"]),
+          ...(calm.drift.relationships_only_declared || []).map((p) => ["Link", pair(p), "Declared, but not found in the code"]),
+          ...(calm.drift.relationships_only_inferred || []).map((p) => ["Link", pair(p), "Found in the code, but not declared"]),
+        ];
+        root.append(el("h2", { text: "Differences from the declared model" }), el("p", { class: "muted mono", text: calm.drift.declared_path || "" }),
+          rows.length ? table("calm-drift", ["What", "Name", "Difference"], rows) : el("p", { class: "muted", id: "calm-drift-none", text: "The code matches the declared model." }));
+      }
     }
     root.append(el("h2", { text: "Components" }), table("components", ["Name", "Kind", "Language", "Folder", "Files", "Lines", "Why"], (overview.components || []).map((c) => [c.name, c.kind, c.language, c.path, c.files, c.loc, c.evidence])));
     root.append(el("p", { class: "muted", id: "languages", text: `Languages: ${Object.entries(overview.languages || {}).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(", ")}` }));
@@ -362,8 +372,8 @@
         el("div", { class: "row" }, el("button", { type: "button", class: "ghost", id: "copy-map", text: "Copy the map", on: { click: async (e) => { await navigator.clipboard.writeText(context.map); e.target.textContent = "Copied"; } } })),
         el("pre", { class: "source", id: "context-map" }, el("code", { text: context.map })),
         el("h2", { text: "Which tool for which question" }), table("routes-table", ["Question", "Use", "Why"], context.routes.map((r) => [r.question, r.use, r.why])),
-        el("h2", { text: "Using it by default" }), el("p", { class: "muted", text: "This adds a short note where your assistant reads project instructions, for Claude Code, Codex, Copilot, Kiro, Cursor and Amazon Q. ananke context disable removes it." }),
-        el("pre", { class: "source" }, el("code", { text: "ananke context enable --dry-run\nananke context enable" })),
+        el("h2", { text: "Using it by default" }), el("p", { class: "muted", text: "This adds a note of about 80 tokens where your assistant reads project instructions, for Claude Code, Codex, Copilot, Kiro, Cursor and Amazon Q. --local keeps it out of commits. ananke context disable removes it." }),
+        el("pre", { class: "source" }, el("code", { text: "ananke context enable --local --dry-run\nananke context enable --local" })),
         el("h2", { text: "Tools" }), table("context-tools", ["Tool", "Ready", "For", "Licence", "Set up"], Object.entries(context.tools).map(([name, tool]) => [name, tool.ready ? "yes" : "no", tool.for, tool.licence, typeof tool.setup === "string" ? tool.setup : (tool.setup ? tool.setup.add_to_claude_code : "")])));
     } catch (error) {
       showError(root, error);
