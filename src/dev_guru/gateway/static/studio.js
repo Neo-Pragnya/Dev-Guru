@@ -29,7 +29,7 @@
       title: "Plan, then review",
       nodes: [
         { ...blankNode(1), id: "plan", outputs: [{ name: "plan", schema_ref: "markdown/v1" }] },
-        { ...blankNode(2), id: "review", inputs: [{ name: "plan", schema_ref: "markdown/v1" }], outputs: [{ name: "findings", schema_ref: "markdown/v1" }], approval_class: "HUMAN" },
+        { ...blankNode(2), id: "review", inputs: [{ name: "plan", schema_ref: "markdown/v1" }], outputs: [{ name: "findings", schema_ref: "markdown/v1" }] },
       ],
     },
   };
@@ -50,6 +50,119 @@
     return edges;
   };
 
+  // The canvas edits the same draft as the form. Where things sit is kept apart from it, so moving a step changes nothing
+  // Ananke sees. Every action has a keyboard way: Tab to a step or port, arrows to move, Enter to connect, Delete to remove.
+  const SVG_NS = "http://www.w3.org/2000/svg";
+  const svg = (tag, attrs, ...children) => {
+    const node = document.createElementNS(SVG_NS, tag);
+    for (const [key, value] of Object.entries(attrs || {})) {
+      if (key === "text") node.textContent = value; else node.setAttribute(key, value);
+    }
+    for (const child of children) node.append(child);
+    return node;
+  };
+  const STEP_W = 200;
+  const PORT_GAP = 24;
+  const stepHeight = (node) => 44 + Math.max((node.inputs || []).length, (node.outputs || []).length, 1) * PORT_GAP;
+  function workflowCanvas(draft, onChange, say) {
+    const place = new Map();
+    let armed = null;
+    let focusAfter = null;
+    const frame = el("div", { class: "canvas-wrap", id: "workflow-canvas" });
+    const where = (node, index) => {
+      if (!place.has(node.id)) place.set(node.id, { x: 20 + (index % 3) * (STEP_W + 80), y: 20 + Math.floor(index / 3) * 130 });
+      return place.get(node.id);
+    };
+    const portAt = (node, side, name) => {
+      const list = side === "in" ? node.inputs || [] : node.outputs || [];
+      const at = where(node, draft.nodes.indexOf(node));
+      return { x: at.x + (side === "in" ? 0 : STEP_W), y: at.y + 44 + (list.findIndex((p) => p.name === name) + 0.5) * PORT_GAP };
+    };
+    const line = (a, b) => {
+      const bend = Math.max(40, Math.abs(b.x - a.x) / 2);
+      return `M${a.x} ${a.y} C${a.x + bend} ${a.y} ${b.x - bend} ${b.y} ${b.x} ${b.y}`;
+    };
+    const connect = (target, input) => {
+      const schema = armed.port.schema_ref;
+      if (armed.node.id === target.id) { say("A step can't take its own output."); return; }
+      if (schema !== input.schema_ref) { say(`These don't fit: ${armed.port.name} gives ${schema}, and ${input.name} takes ${input.schema_ref}.`); return; }
+      const wired = (draft.edges || []).filter((e) => !(e.target === target.id && e.target_port === input.name));
+      draft.edges = [...wired, { id: `e${Date.now().toString(36)}${wired.length}`, source: armed.node.id, source_port: armed.port.name, target: target.id, target_port: input.name }];
+      say(`Connected ${armed.node.id}.${armed.port.name} to ${target.id}.${input.name}.`);
+      armed = null;
+      onChange();
+    };
+    const draw = () => {
+      const width = Math.max(640, ...draft.nodes.map((n, i) => where(n, i).x + STEP_W + 60));
+      const height = Math.max(240, ...draft.nodes.map((n, i) => where(n, i).y + stepHeight(n) + 40));
+      const canvas = svg("svg", { class: "graph", width, height, viewBox: `0 0 ${width} ${height}`, role: "group", "aria-label": "Workflow canvas" });
+      canvas.append(svg("defs", {}, svg("marker", { id: "wf-arrow", viewBox: "0 0 8 8", refX: 7, refY: 4, markerWidth: 7, markerHeight: 7, orient: "auto" }, svg("path", { d: "M0 0L8 4L0 8z", class: "arrow-head" }))));
+      for (const edge of draft.edges || []) {
+        const from = draft.nodes.find((n) => n.id === edge.source);
+        const to = draft.nodes.find((n) => n.id === edge.target);
+        if (!from || !to) continue;
+        const label = `Link from ${edge.source}.${edge.source_port} to ${edge.target}.${edge.target_port}. Press Delete to remove.`;
+        const remove = () => { draft.edges = draft.edges.filter((e) => e !== edge); say(`Removed the link to ${edge.target}.${edge.target_port}.`); onChange(); };
+        const path = svg("path", { d: line(portAt(from, "out", edge.source_port), portAt(to, "in", edge.target_port)), class: "edge workflow-edge", "marker-end": "url(#wf-arrow)", tabindex: "0", role: "button", "aria-label": label }, svg("title", { text: label }));
+        path.addEventListener("keydown", (e) => { if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); remove(); } });
+        canvas.append(path);
+      }
+      draft.nodes.forEach((node, index) => {
+        const at = where(node, index);
+        const box = svg("g", { class: "node workflow-node", "data-id": node.id, transform: `translate(${at.x} ${at.y})`, tabindex: "0", role: "button", "aria-label": `Step ${node.id}, ${node.capability_ref || "no capability yet"}. Arrow keys move it, and Delete removes it.` },
+          svg("rect", { width: STEP_W, height: stepHeight(node), rx: 9 }),
+          svg("text", { x: 10, y: 20, class: "node-label", text: String(node.id).slice(0, 24) }),
+          svg("text", { x: 10, y: 35, class: "node-sub", text: String(node.capability_ref || "no capability yet").slice(0, 28) }));
+        const move = (x, y) => { at.x = Math.max(0, x); at.y = Math.max(0, y); };
+        box.addEventListener("keydown", (e) => {
+          if (e.target !== box) return;
+          const by = { ArrowLeft: [-20, 0], ArrowRight: [20, 0], ArrowUp: [0, -20], ArrowDown: [0, 20] }[e.key];
+          if (by) { e.preventDefault(); move(at.x + by[0], at.y + by[1]); focusAfter = `[data-id="${CSS.escape(node.id)}"]`; draw(); say(`${node.id} moved.`); }
+          if (e.key === "Delete" || e.key === "Backspace") {
+            e.preventDefault();
+            draft.nodes.splice(draft.nodes.indexOf(node), 1);
+            draft.edges = (draft.edges || []).filter((k) => k.source !== node.id && k.target !== node.id);
+            say(`Removed ${node.id}.`);
+            onChange();
+          }
+        });
+        box.addEventListener("pointerdown", (start) => {
+          if (start.target.classList?.contains("workflow-port")) return;
+          box.setPointerCapture?.(start.pointerId);
+          const from = { x: at.x, y: at.y, px: start.clientX, py: start.clientY };
+          const dragging = (e) => { move(from.x + e.clientX - from.px, from.y + e.clientY - from.py); box.setAttribute("transform", `translate(${at.x} ${at.y})`); };
+          const stop = () => { box.removeEventListener("pointermove", dragging); box.removeEventListener("pointerup", stop); focusAfter = `[data-id="${CSS.escape(node.id)}"]`; draw(); };
+          box.addEventListener("pointermove", dragging);
+          box.addEventListener("pointerup", stop);
+        });
+        const port = (side, item, i) => {
+          const fits = side === "in" && armed && armed.port.schema_ref === item.schema_ref && armed.node.id !== node.id;
+          const circle = svg("circle", { cx: side === "in" ? 0 : STEP_W, cy: 44 + (i + 0.5) * PORT_GAP, r: 7, tabindex: "0", role: "button",
+            class: `workflow-port${fits ? " fits" : ""}${armed && armed.port === item ? " armed" : ""}`, "data-port": `${side}:${node.id}:${item.name}`,
+            "aria-label": side === "out" ? `Output ${item.name} of ${node.id}, ${item.schema_ref}. Press Enter to start a link.` : `Input ${item.name} of ${node.id}, ${item.schema_ref}. Press Enter to finish a link.` },
+          svg("title", { text: `${item.name}: ${item.schema_ref}` }));
+          const act = () => {
+            if (side === "out") { armed = { node, port: item }; say(`Choose an input that takes ${item.schema_ref}. Escape cancels.`); focusAfter = `[data-port="out:${CSS.escape(node.id)}:${CSS.escape(item.name)}"]`; draw(); return; }
+            if (!armed) { say("Choose an output first."); return; }
+            connect(node, item);
+          };
+          circle.addEventListener("click", act);
+          circle.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); act(); }
+            if (e.key === "Escape") { armed = null; say("Cancelled."); draw(); }
+          });
+          box.append(circle, svg("text", { x: side === "in" ? 12 : STEP_W - 12, y: 48 + (i + 0.5) * PORT_GAP, class: "node-sub", "text-anchor": side === "in" ? "start" : "end", text: String(item.name).slice(0, 14) }));
+        };
+        (node.inputs || []).forEach((item, i) => port("in", item, i));
+        (node.outputs || []).forEach((item, i) => port("out", item, i));
+        canvas.append(box);
+      });
+      frame.replaceChildren(canvas);
+      if (focusAfter) { canvas.querySelector(focusAfter)?.focus(); focusAfter = null; }
+    };
+    return { frame, draw };
+  }
+
   views.workflows = async () => {
     page("Workflows", "Put capabilities in order, and Ananke checks the draft and shows what would run. Previewing runs nothing.");
     const root = document.querySelector("#main section");
@@ -69,7 +182,10 @@
         ? table("workflow-edges", ["From", "To"], draft.edges.map((e) => [`${e.source}.${e.source_port}`, `${e.target}.${e.target_port}`]))
         : el("p", { class: "muted", text: "None yet. Steps with an input join to an earlier output of the same type." }));
     };
-    const relink = () => { draft.edges = linkMatching(draft); drawLinks(); };
+    let linkedByHand = false;
+    const relink = () => { if (!linkedByHand) draft.edges = linkMatching(draft); drawLinks(); canvas.draw(); };
+    const status = el("p", { class: "muted", id: "workflow-status", role: "status" });
+    const canvas = workflowCanvas(draft, () => { linkedByHand = true; drawSteps(); drawLinks(); canvas.draw(); }, (text) => { status.textContent = text; });
     const drawSteps = () => {
       steps.replaceChildren(...draft.nodes.map((node, index) => {
         const set = (key, parse = (v) => v) => (event) => { node[key] = parse(event.target.value); relink(); };
@@ -96,7 +212,9 @@
     };
     const load = (next) => {
       Object.assign(draft, { nodes: [], ...next });
-      if (!next.edges) draft.edges = linkMatching(draft); // an imported draft keeps the links it came with
+      linkedByHand = !!next.edges; // an imported draft keeps the links it came with
+      if (!next.edges) draft.edges = linkMatching(draft);
+      canvas.draw();
       title.value = draft.title || "";
       identity.value = draft.workflow_id || "";
       drawSteps();
@@ -124,6 +242,8 @@
         showError(result, error);
       }
     };
+    const hint = el("p", { class: "muted", id: "workflow-canvas-hint", text: "Drag a step, or Tab to it and use the arrow keys. To link, choose an output and then an input of the same type, by click or Enter. Delete removes a step or link. Where steps sit isn't part of the workflow.", hidden: true });
+    canvas.frame.hidden = true;
     const importer = el("input", { type: "file", id: "workflow-import", accept: "application/json,.json", on: { change: async (event) => {
       const file = event.target.files[0];
       if (!file) return;
@@ -138,9 +258,19 @@
       el("div", { class: "row" }, field("Title", title), field("ID", identity),
         field("Start from", el("select", { id: "workflow-preset", on: { change: (e) => load(JSON.parse(JSON.stringify(PRESETS[e.target.value]))) } },
           ...[["blank", "A blank draft"], ["single", "One step"], ["review", "Plan, then review"]].map(([value, text]) => el("option", { value, text }))))),
-      steps,
+      el("div", { class: "row", role: "group", "aria-label": "How to edit" }, ...[["form", "Form"], ["canvas", "Canvas"]].map(([mode, text]) =>
+        el("button", { type: "button", class: "ghost", id: `workflow-mode-${mode}`, "aria-pressed": mode === "form" ? "true" : "false", text, on: { click: () => {
+          steps.hidden = mode !== "form";
+          canvas.frame.hidden = mode !== "canvas";
+          hint.hidden = mode !== "canvas";
+          document.querySelector("#workflow-mode-form").setAttribute("aria-pressed", String(mode === "form"));
+          document.querySelector("#workflow-mode-canvas").setAttribute("aria-pressed", String(mode === "canvas"));
+          if (mode === "canvas") canvas.draw();
+        } } }))),
+      steps, hint, canvas.frame, status,
       el("div", { class: "row" },
-        el("button", { type: "button", class: "ghost", id: "workflow-add", text: "Add a step", on: { click: () => { draft.nodes.push(blankNode(draft.nodes.length + 1)); drawSteps(); drawLinks(); } } }),
+        el("button", { type: "button", class: "ghost", id: "workflow-relink", text: "Link by type", on: { click: () => { linkedByHand = false; relink(); status.textContent = "Linked each input to the nearest earlier output of its type."; } } }),
+        el("button", { type: "button", class: "ghost", id: "workflow-add", text: "Add a step", on: { click: () => { draft.nodes.push(blankNode(draft.nodes.length + 1)); drawSteps(); drawLinks(); canvas.draw(); } } }),
         el("button", { type: "button", id: "workflow-preview", text: inReport() ? "Preview (needs dev serve)" : "Preview", on: { click: preview } }),
         el("button", { type: "button", class: "ghost", id: "workflow-export", text: "Export", on: { click: () => download(`${String(draft.workflow_id).replace(/[^\w-]+/g, "-")}.json`, JSON.stringify(draft, null, 2), "application/json") } }),
         field("Import", importer)),
@@ -173,10 +303,11 @@
         showError(result, error);
       }
     };
-    root.append(table("documents", ["File", "Lines", "", ""], files.map((f) => [f.path, f.lines,
+    root.append(table("documents", ["File", "Lines", "", "", ""], files.map((f) => [f.path, f.lines,
+      el("button", { type: "button", class: "ghost", text: "Make a process", "aria-label": `Make a process from ${f.path}`, on: { click: build(f.path, "process") } }),
       el("button", { type: "button", class: "ghost", text: "Make a deck", "aria-label": `Make a deck from ${f.path}`, on: { click: build(f.path, "deck") } }),
       el("button", { type: "button", class: "ghost", text: "Make a diagram", "aria-label": `Make a diagram from ${f.path}`, on: { click: build(f.path, "diagram") } })])),
-    result, el("p", { class: "muted", text: "A deck splits on lines of ---. A diagram draws only what the document states, and cites it." }));
+    result, el("p", { class: "muted", text: "A deck splits on lines of ---. A diagram draws only what the document states, and cites it. A process reads a numbered list where each step names who does it, as 1. Sales: Receive the order, and gives swimlanes and BPMN." }));
   };
 
   // ---------------------------------------------------------------- learning review

@@ -10,6 +10,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
 
 ---
 
+## [0.8.0] — 2026-11-05
+
+### Added
+
+- **A workflow canvas.** Drag steps, or use the keyboard: Tab to a step or port, arrow keys to move, Enter to link, Delete to remove. Links only join ports of the same type. It edits the same draft as the form, and where steps sit isn't part of it, so moving one doesn't change the plan.
+- **`dev bpmn`, and Make a process on the Documentation page.** From a reviewed process, read by Ananke: swimlanes, an offline viewer where each step cites its source, and BPMN 2.0 for tools like Camunda Modeler. A file edited elsewhere reads back. Nothing runs. Guide: [Business processes](docs/guides/business-processes.md).
+
+### Changed
+
+- Needs Ananke 0.3.26 or later.
+
+---
+
 ## [0.7.0] — 2026-11-05
 
 ### Added

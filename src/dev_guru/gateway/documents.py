@@ -48,8 +48,23 @@ def _read(root: Path, path: str) -> tuple[Path, str]:
         return Path(target), handle.read()
 
 
-def build(root: Path, path: str, what: str) -> dict[str, Any]:
+def build(root: Path, path: str, what: str, client: Any = None) -> dict[str, Any]:
     source, text = _read(root, path)
+    if what == "process":
+        from dev_guru import bpmn, errors
+
+        try:
+            answer = client.process_model(root, text, source.name)
+        except errors.GuruError as exc:
+            raise DocumentError("PROCESS_FAILED", exc.message) from exc
+        model = answer["model"]
+        return {
+            "name": f"{source.stem}.process.html",
+            "media_type": "text/html",
+            "content": bpmn.viewer(model, answer["bpmn"]),
+            "problems": list(model["problems"]),
+            "summary": "Open it in a browser for the swimlanes, each step's source and the BPMN.",
+        }
     if what == "deck":
         from dev_guru import present as deck
 
@@ -79,7 +94,7 @@ def build(root: Path, path: str, what: str) -> dict[str, Any]:
             "problems": list(dg.svg_problems(svg)),
             "summary": "It draws what the document states.",
         }
-    raise DocumentError("INVALID_REQUEST", "what must be deck or diagram")
+    raise DocumentError("INVALID_REQUEST", "what must be deck, diagram or process")
 
 
 __all__ = ["DocumentError", "build", "listed"]

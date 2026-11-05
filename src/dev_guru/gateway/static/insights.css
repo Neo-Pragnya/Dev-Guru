@@ -41,4 +41,12 @@ button.link { padding: 0; border: 0; background: none; color: var(--link); text-
 .workflow-step legend { font-weight: 600; padding: 0 6px; }
 .workflow-step .field { flex: 1 1 200px; }
 .workflow-step input, .workflow-step select { width: 100%; }
+.workflow-node { touch-action: none; }
+.workflow-port { fill: var(--surface); stroke: var(--muted); stroke-width: 2; cursor: pointer; }
+.workflow-port:focus { outline: none; stroke: var(--link); stroke-width: 3; }
+.workflow-port.armed { fill: var(--warn); }
+.workflow-port.fits { fill: var(--ok); stroke: var(--ok); }
+.workflow-edge { cursor: pointer; }
+.workflow-edge:focus { outline: none; stroke: var(--link); stroke-width: 3; }
+#workflow-canvas[hidden], #workflow-steps[hidden] { display: none; }
 
