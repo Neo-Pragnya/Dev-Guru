@@ -15,6 +15,7 @@ released.
 | --- | --- |
 | **0.9.0** | Findings, from reports in the repository, with what to fix first. What's certain: how far to trust each view |
 | **0.10.0** | Every page looks and works like the first six views: a rail, a live stage, an inspector and a walk-through, in reports and `dev serve`. A framed report plays each view in turn |
+| **0.11.0** | `dev serve` opens on the explorer. Progress, `--verbose` and `--logs` for `dev explore`. Windows graphs fixed, with a check on three platforms. About three times faster |
 | **0.8.0** | A workflow canvas that works from the keyboard. Swimlanes and BPMN 2.0 from a reviewed process |
 | **0.7.0** | Workflows, Documentation and Learning review in the web interface, so nothing is marked as missing |
 | **0.6.0** | One offline file with every page of `dev serve`, and an example that shows them all. Folders of notebooks: code in `%%writefile` cells counts, and a Notebooks page explains each one. Impact and paths on the Code map |

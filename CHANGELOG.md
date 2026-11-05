@@ -10,6 +10,27 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
 
 ---
 
+## [0.11.0] — 2026-11-05
+
+### Fixed
+
+- **Windows: the constellation had no links and the flow one package.** Ananke wrote graph paths with backslashes on Windows, so imports between a repository's own files weren't matched. Ananke 0.3.28 fixes it, and Dev Guru now needs it. A new CI job runs `dev explore` on Linux, macOS and Windows and checks the report has its links and packages.
+- **`dev explore` failed with `HARNESS_FAILED` on a folder copied or moved with its `.ananke` history.** Its run key now names the workspace, as Ananke's request does.
+
+### Added
+
+- **`dev serve` opens on the explorer.** It has every view a report has, Constellation, Flow, Impact, Calls, Hotspots and Tour among them, with the other pages live in its tabs. The pages alone are at `/app`. With no code graph yet, it offers to build one, because reading a page never starts anything.
+- **`dev explore` says what it's doing,** each step with a running clock and how long it took. `-v`/`--verbose` adds what each step found, and `-q`/`--quiet` says nothing until it's done.
+- **`--logs FILE` on `dev explore` and `dev serve`:** a record for finding faults, with versions, the operating system, each step's time and findings, warnings and any error in full. It holds no environment variables, tokens or file contents.
+- **A warning when a graph looks wrong,** whatever the options: paths written with backslashes, many Python files with no imports between them, or hundreds of files in one package.
+
+### Changed
+
+- **`dev explore` is about three times faster** on a large repository: 40 seconds to 13 on 700 files, with the same report. Source is read in one call with Ananke's `read_sources`, and the repository map reuses the analysis instead of running another.
+- Needs Ananke 0.3.28 or later.
+
+---
+
 ## [0.10.0] — 2026-11-05
 
 ### Changed

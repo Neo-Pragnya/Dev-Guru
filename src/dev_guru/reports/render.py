@@ -31,7 +31,7 @@ from typing import Any
 from dev_guru.version import __version__
 
 RENDERER = "dev-guru/explorer-html@1"
-PLACEHOLDER = re.compile(r"\{\{(TITLE|CSS|JS|DATA|MANIFEST|SERVE_DATA|SERVE_SHELL)\}\}")
+PLACEHOLDER = re.compile(r"\{\{(TITLE|CSS|JS|DATA|MANIFEST|SERVE_DATA|SERVE_SHELL|LIVE)\}\}")
 LS, PS = (
     chr(0x2028),
     chr(0x2029),
@@ -137,9 +137,34 @@ def render(
         "JS": _asset("explorer.js"),
         "DATA": safe_json({k: v for k, v in model.items() if k != "serve"}),
         "MANIFEST": safe_json(report_manifest),
+        "LIVE": "null",
     }
     # One pass over the template only: inserted content (source code may itself contain "{{MANIFEST}}")
     # is never scanned again.
+    return PLACEHOLDER.sub(lambda m: values[m.group(1)], page)
+
+
+def live_page() -> str:
+    """The explorer for ``dev serve``: no data of its own, and its script and style as files the gateway serves.
+
+    The gateway's own Content-Security-Policy applies to it, so the report's offline-only policy is left out: the page
+    has to ask the gateway for its model.
+    """
+    page = _asset("explorer.html")
+    page = re.sub(r'<meta http-equiv="Content-Security-Policy"[^>]*>\n?', "", page)
+    page = page.replace(
+        "<style>{{CSS}}</style>",
+        '<link rel="icon" href="/favicon.svg" type="image/svg+xml">\n<link rel="stylesheet" href="/explorer.css">',
+    )
+    page = page.replace("<script>{{JS}}</script>", '<script src="/explorer.js"></script>')
+    values = {
+        "TITLE": "Dev Guru",
+        "DATA": "null",
+        "MANIFEST": "null",
+        "SERVE_DATA": "null",
+        "SERVE_SHELL": "null",
+        "LIVE": "true",
+    }
     return PLACEHOLDER.sub(lambda m: values[m.group(1)], page)
 
 
@@ -160,4 +185,13 @@ def write(
     return output, sidecar
 
 
-__all__ = ["MANIFEST_SCHEMA", "RENDERER", "digest", "manifest", "render", "safe_json", "write"]
+__all__ = [
+    "MANIFEST_SCHEMA",
+    "RENDERER",
+    "digest",
+    "live_page",
+    "manifest",
+    "render",
+    "safe_json",
+    "write",
+]

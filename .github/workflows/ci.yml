@@ -88,3 +88,30 @@ jobs:
           name: dist-scan
           path: scan-report/
           if-no-files-found: warn
+
+  portable:
+    # What dev explore draws must match on every platform: on Windows, paths once came back with backslashes, and
+    # the constellation had no links while every Linux test passed.
+    name: portable (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --all-extras --python 3.12
+
+      - name: The same report on every platform
+        run: uv run pytest -p no:cacheprovider tests/test_portable.py

@@ -155,6 +155,7 @@ const analyse = async () => {
 };
 
 await goto(login);
+await goto(`${origin}/app`); // the pages; the explorer at / has its own journey below
 await journey("before any analysis, a page offers one and shows no invented data", async () => {
   await route("#/data");
   expect(await evaluate(`!!document.querySelector("#analyze")`), "no offer to analyse");
@@ -415,6 +416,28 @@ await journey("saving tokens shows a small map and the tools", async () => {
   await shot("context");
   expect((await text("#context-map")).includes("repository map"), "no map");
   expect((await text("#context-tools")).includes("GPL-3.0-or-later"), "no licence");
+});
+await journey("dev serve opens on the explorer: the constellation, every tab, and live pages in its frame", async () => {
+  await send("Page.navigate", { url: `${origin}/` });
+  await until(`document.querySelectorAll("#tabs .tab").length >= 20 && !document.querySelector("#space").hidden`, "the explorer", 90000);
+  const r = await evaluate(`({ tabs: [...document.querySelectorAll("#tabs .tab")].map((t) => t.dataset.view), files: window.__devGuru.D.files.length, title: document.querySelector("#viewTitle").textContent, painted: (() => { const c = document.querySelector("#space"); return c.getContext("2d").getImageData(0, 0, c.width, c.height).data.reduce((a, v, i) => (i % 4 === 3 ? a + (v > 0) : a), 0); })() })`);
+  for (const want of ["constellation", "flow", "impact", "calls", "hotspots", "tour", "overview", "codemap", "data", "cves", "workflows"]) expect(r.tabs.includes(want), `no ${want} tab`);
+  expect(r.files > 0 && r.painted > 200, `the constellation is empty: ${r.files} files, ${r.painted} pixels`);
+  await shot("serve-explorer");
+  await evaluate(`document.querySelector('.tab[data-view="data"]').click()`);
+  const inner = (expr) => evaluate(`(() => { const doc = document.querySelector("#serveFrame").contentDocument; return ${expr}; })()`);
+  await until(`(() => { const d = document.querySelector("#serveFrame").contentDocument; return d && d.querySelector("#main h1")?.textContent === "Data" && !d.querySelector("#main").hasAttribute("aria-busy"); })()`, "the Data page in the frame", 60000);
+  const page = await inner(`({ live: !window.DEV_GURU_STATIC, own: getComputedStyle(doc.querySelector(".top")).display, tables: doc.querySelectorAll(".table-card").length, rail: doc.querySelectorAll("#rail .tree-item").length })`);
+  expect(page.own === "none", "the page's own bar shows inside the explorer");
+  if (expectGolden) expect(page.tables >= 4 && page.rail >= 4, `the live ERD isn't there: ${JSON.stringify(page)}`);
+  await shot("serve-explorer-data");
+  // a link inside a page moves the explorer's tabs with it
+  await inner(`(doc.defaultView.location.hash = "#/cves", true)`);
+  await until(`document.querySelector('.tab[aria-selected="true"]')?.dataset.view === "cves"`, "the tabs to follow");
+  await evaluate(`document.querySelector('.tab[data-view="hotspots"]').click()`);
+  await sleep(300);
+  expect(await evaluate(`document.querySelector("#serveFrame").hidden && document.querySelectorAll("#treemap .tm-cell").length > 0`), "the explorer's own view doesn't come back");
+  await goto(`${origin}/app`);
 });
 await journey("every new page has no sideways scroll on a phone, and no script errors", async () => {
   await viewport(390, 844, true);

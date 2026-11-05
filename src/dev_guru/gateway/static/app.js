@@ -568,7 +568,11 @@ async function init() {
   try { saved = localStorage.getItem("dev-guru-theme"); } catch { /* not available here */ }
   setTheme(saved || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
   if (window.DEV_GURU_STATIC) document.documentElement.classList.add("in-report");
-  try { if (window.parent !== window && window.parent.document.documentElement.classList.contains("embed")) document.documentElement.classList.add("embed"); } catch { /* not ours to read */ }
+  // inside the explorer, its tabs replace this page's own bar, under dev serve as in a report
+  try {
+    if (window.parent !== window && window.parent.document.querySelector("#serveFrame")) document.documentElement.classList.add("in-report");
+    if (window.parent !== window && window.parent.document.documentElement.classList.contains("embed")) document.documentElement.classList.add("embed");
+  } catch { /* not ours to read */ }
   document.querySelector("#theme").addEventListener("click", () => setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark"));
   // The address holds the page, so the skip link moves focus instead of changing it.
   document.querySelector(".skip").addEventListener("click", (event) => { event.preventDefault(); document.querySelector("#main").focus(); });
@@ -589,6 +593,8 @@ async function init() {
   for (const w of state.workspaces) picker.append(el("option", { value: w.id, title: w.path, text: w.name }));
   let remembered = null;
   try { remembered = sessionStorage.getItem("dev-guru-workspace"); } catch { /* not available here */ }
+  const asked = new URLSearchParams(location.search).get("workspace"); // the explorer says which
+  if (state.workspaces.some((w) => w.id === asked)) remembered = asked;
   state.workspace = state.workspaces.some((w) => w.id === remembered) ? remembered : state.workspaces[0].id;
   picker.value = state.workspace;
   picker.addEventListener("change", () => {

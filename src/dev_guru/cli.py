@@ -27,6 +27,13 @@ console = Console()
 err = Console(stderr=True)
 TransportOpt = Annotated[str, typer.Option(help=f"Harness transport: {', '.join(TRANSPORTS)}")]
 JsonOpt = Annotated[bool, typer.Option("--json", help="Machine-readable output")]
+LogsOpt = Annotated[
+    Path | None,
+    typer.Option(
+        "--logs",
+        help="Write what happened, with versions, timings and any error in full, to this file. No secrets or file contents",
+    ),
+]
 
 
 def _version(value: bool) -> None:
@@ -126,6 +133,13 @@ def explore(
             help="Also look up dependencies at osv.dev. Sends package names and versions, and nothing else",
         ),
     ] = False,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Also say what each step found, as it goes")
+    ] = False,
+    quiet: Annotated[
+        bool, typer.Option("--quiet", "-q", help="Say nothing until it's done")
+    ] = False,
+    logs: LogsOpt = None,
     as_json: JsonOpt = False,
 ) -> None:
     """Explore a codebase: Ananke builds the graph, Dev Guru writes an interactive, offline HTML explorer.
@@ -133,19 +147,37 @@ def explore(
     The report is one file with no network access: architecture constellation, dependency flow, impact rings,
     call graph, hotspots, a guided tour, search and a source inspector.
     """
+    if logs is not None:
+        from dev_guru import logs as log_file
+
+        err.print(f"[dim]Writing a log to {log_file.start(logs, 'explore')}[/dim]")
     try:
         client = connect(transport)
+        from dev_guru.progress import Shown, Silent
+
+        # steps go to stderr, so --json on stdout stays clean
+        # --json is for scripts, so it says nothing else unless asked to with --verbose
+        shown = Silent() if quiet or (as_json and not verbose) else Shown(verbose=verbose)
         result = service.explore(
             workspace,
             client=client,
             name=name,
             profile=profile,
             check_vulnerabilities=check_vulnerabilities,
+            progress=shown,
         )
-        page, sidecar = service.export_html(result, output, client=client)
+        page, sidecar = service.export_html(result, output, client=client, progress=shown)
     except errors.GuruError as exc:
+        from dev_guru.logs import LOGGER
+
+        LOGGER.error("%s: %s", exc.code, exc)
         _fail(exc, as_json, 1)
         return
+    except Exception:
+        from dev_guru.logs import LOGGER
+
+        LOGGER.exception("dev explore stopped on an unexpected error")
+        raise
     project = result.model["project"]
     summary = {
         "ok": True,
@@ -307,9 +339,15 @@ def serve(
     port: Annotated[int, typer.Option(help="Local port (default: any free one)")] = 0,
     open_browser: Annotated[bool, typer.Option("--open/--no-open", help="Open the browser")] = True,
     transport: TransportOpt = "in-process",
+    logs: LogsOpt = None,
 ) -> None:
     """Start the local web gateway. It only listens on this computer, and only the printed link gets in."""
     from dev_guru.gateway import Gateway
+
+    if logs is not None:
+        from dev_guru import logs as log_file
+
+        err.print(f"[dim]Writing a log to {log_file.start(logs, 'serve')}[/dim]")
 
     try:
         client = connect(transport)

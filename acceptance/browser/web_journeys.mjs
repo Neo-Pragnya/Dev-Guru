@@ -139,10 +139,16 @@ const finished = async (runStateName, what, ms = 120000) => {
 const drain = (ids) => until(`(async () => { const w = (await (await fetch("/api/v1/workspaces")).json()).workspaces[0].id; for (const id of ${JSON.stringify(ids)}) { const r = await (await fetch("/api/v1/runs/" + id + "?workspace=" + w)).json(); if (r.state === "queued" || r.state === "running") return false; } return true; })()`, "the runs to finish", 120000);
 
 await viewport(1440, 900);
-await journey("the login link signs in and leaves the address bar", async () => {
+await journey("the login link signs in, leaves the address bar, and opens the explorer", async () => {
   await goto(login);
+  await until(`document.querySelectorAll("#tabs .tab").length >= 6 || !!document.querySelector("#build-graph")`, "the explorer", 30000).catch(() => {});
+  const landed = await evaluate(`({ path: location.pathname + location.search, tabs: document.querySelectorAll("#tabs .tab").length, build: !!document.querySelector("#build-graph"), pages: document.querySelector('a[href^="/app"]')?.textContent })`);
+  await goto(`${origin}/app`); // the rest of these journeys are about the pages
+  expect(landed.path === "/", `address still shows ${landed.path}`);
+  // a new workspace has no graph yet: the explorer offers to build one, and the pages are a click away
+  expect(landed.tabs >= 6 || (landed.build && landed.pages), `the explorer shows neither its tabs nor a way on: ${JSON.stringify(landed)}`);
   const r = await evaluate(`({ path: location.pathname + location.search, h1: document.querySelector("h1")?.textContent, pill: document.querySelector("#harness").textContent })`);
-  expect(r.path === "/", `address still shows ${r.path}`);
+  expect(r.path === "/app", `the pages are at ${r.path}`);
   expect(r.h1 === "Overview", `heading is ${r.h1}`);
   expect(/^Ananke \d/.test(r.pill), `harness pill says ${r.pill}`);
   await shot("overview");
@@ -152,7 +158,7 @@ await journey("the strict content policy holds: no inline code, and nothing bloc
   const r = await evaluate(`(() => { const s = getComputedStyle(document.querySelector(".top")); return { styled: s.display === "flex", inline: document.querySelectorAll("script:not([src]), style, [onclick]").length }; })()`);
   expect(r.styled, "the stylesheet didn't apply");
   expect(r.inline === 0, `${r.inline} inline elements`);
-  const csp = await evaluate(`(async () => (await fetch("/")).headers.get("content-security-policy"))()`);
+  const csp = await evaluate(`(async () => (await fetch("/app")).headers.get("content-security-policy"))()`);
   expect(/default-src 'self'/.test(csp) && !/unsafe/.test(csp), `policy: ${csp}`);
   const blocked = await evaluate(`new Promise((done) => { const s = document.createElement("script"); s.textContent = "window.__inline = 1"; document.head.append(s); s.remove(); done(window.__inline === 1); })`);
   expect(!blocked, "an inline script ran");
@@ -160,14 +166,14 @@ await journey("the strict content policy holds: no inline code, and nothing bloc
   problems = problems.filter((p) => !p.includes("Content Security Policy")); // that refusal was this check
 });
 await journey("the interface works from the keyboard alone", async () => {
-  await goto(`${origin}/`);
+  await goto(`${origin}/app`);
   await key("Tab", "Tab", 9);
   expect((await evaluate(`document.activeElement.className`)) === "skip", "the first Tab isn't the skip link");
   await key("Enter", "Enter", 13);
   await sleep(150);
   const skipped = await evaluate(`({ focus: document.activeElement.id, h1: document.querySelector("h1").textContent, hash: location.hash })`);
   expect(skipped.focus === "main" && skipped.h1 === "Overview", `the skip link led to ${JSON.stringify(skipped)}`);
-  await goto(`${origin}/`);
+  await goto(`${origin}/app`);
   let reached = false;
   for (let i = 0; i < 14 && !reached; i++) { await key("Tab", "Tab", 9); reached = (await evaluate(`document.activeElement.getAttribute("href")`)) === "#/runs"; }
   expect(reached, "Tab never reached Runs");

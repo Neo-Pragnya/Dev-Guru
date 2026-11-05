@@ -13,6 +13,7 @@ from typing import Any
 
 from dev_guru import errors
 from dev_guru.client import AnankeClient
+from dev_guru.progress import Progress, Silent
 
 MAX_DEPTH = 4
 MAX_SYMBOLS = 20_000
@@ -44,9 +45,12 @@ def build(
     files: list[str],
     name: str,
     version: str,
+    progress: Progress | None = None,
 ) -> dict[str, Any]:
+    progress = progress or Silent()
     info = client.info()
     context: dict[str, Any] = {}
+    progress.detail("a small map for an AI assistant")
     try:
         context = {**client.context_map(root, budget=1500), **client.context_status(root)}
     except (errors.GuruError, OSError, ValueError):
@@ -73,6 +77,7 @@ def build(
         spent += _sized(found)
         code[f"{collapse}|{depth if collapse == 'directory' else 0}|{path}"] = found
 
+    progress.detail("the code graph at each folder depth, by file and by symbol")
     for depth in range(1, MAX_DEPTH + 1):
         view("directory", depth)
     view("file", 1)
@@ -82,13 +87,18 @@ def build(
     _evidence_paths(report, wanted)
     sources: dict[str, list[str]] = {}
     spent_source = 0
-    for path in sorted(wanted):
+    progress.detail(f"reading {len(wanted)} source files")
+    try:
+        found = client.read_sources(root, sorted(wanted)).get("files", {})
+    except (errors.GuruError, OSError, ValueError):
+        found = {}
+    for path in sorted(found):
         if spent_source > MAX_SOURCE_BYTES:
+            progress.detail(
+                f"source text stops at {MAX_SOURCE_BYTES // 1_000_000} MB, so later files have none"
+            )
             break
-        try:
-            lines = client.read_source(root, path, 1, None).get("lines", [])
-        except (errors.GuruError, OSError, ValueError):
-            continue
+        lines = found[path].get("lines", [])
         spent_source += sum(len(line) for line in lines)
         sources[path] = list(lines)
 

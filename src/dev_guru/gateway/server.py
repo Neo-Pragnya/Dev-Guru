@@ -31,6 +31,7 @@ from urllib.parse import parse_qs, urlsplit
 from dev_guru import errors
 from dev_guru.client.port import AnankeClient
 from dev_guru.gateway import documents
+from dev_guru.logs import LOGGER
 from dev_guru.version import __version__
 
 HOST = "127.0.0.1"
@@ -39,7 +40,7 @@ RUN_WORKERS = 2
 CSRF_HEADER = "X-Dev-Guru-CSRF"
 # A fixed list, so no request path ever becomes a file path.
 _STATIC = {
-    "/": ("index.html", "text/html; charset=utf-8"),
+    "/app": ("index.html", "text/html; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
     "/app.css": ("app.css", "text/css; charset=utf-8"),
     "/map.js": ("map.js", "text/javascript; charset=utf-8"),
@@ -50,6 +51,11 @@ _STATIC = {
     "/insights.js": ("insights.js", "text/javascript; charset=utf-8"),
     "/studio.js": ("studio.js", "text/javascript; charset=utf-8"),
     "/favicon.svg": ("favicon.svg", "image/svg+xml"),
+}
+# The explorer's own files, from the report renderer, so a report and dev serve show the same thing.
+_EXPLORER = {
+    "/explorer.js": ("explorer.js", "text/javascript; charset=utf-8"),
+    "/explorer.css": ("explorer.css", "text/css; charset=utf-8"),
 }
 _RUN_ID = r"run-[0-9a-f]+"
 _ARTIFACT = r"[A-Za-z0-9_][A-Za-z0-9_.-]*"
@@ -139,11 +145,13 @@ class Gateway:
         return root
 
     def drive(self, root: Path, run_id: str) -> None:
+        LOGGER.info("driving run %s", run_id)
         try:
             self.client.drive_run(root, run_id)
         except (
             Exception
-        ):  # the harness records failures on the run itself; this thread has nowhere to report
+        ):  # the harness records failures on the run itself, and the log keeps the trace
+            LOGGER.exception("run %s stopped on an error", run_id)
             return
 
 
@@ -172,7 +180,8 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_header("Cross-Origin-Resource-Policy", "same-origin")
         self.send_header(
             "Content-Security-Policy",
-            "default-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+            # the explorer frames the other pages, so this origin may frame itself, and nothing else may frame it
+            "default-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'self'",
         )
 
     def _send(self, status: int, body: bytes, media_type: str, *extra: tuple[str, str]) -> None:
@@ -246,19 +255,25 @@ class _Handler(BaseHTTPRequestHandler):
 
     # ------------------------------------------------------------------ dispatch
     def _guarded(self, work: Any) -> None:
+        # the path alone: the query can hold the login token
+        where = f"{self.command} {urlsplit(self.path).path}"
         try:
             self._check_host()
             work()
         except _Reject as exc:
+            LOGGER.info("%s refused: %s %s", where, exc.code, exc.message)
             self._error(exc.status, exc.code, exc.message)
         except errors.HarnessRefused as exc:
+            LOGGER.warning("%s: Ananke refused: %s %s", where, exc.harness_code, exc.message)
             status = 503 if exc.retryable else _REFUSAL_STATUS.get(exc.harness_code, 400)
             self._error(status, exc.harness_code, exc.message, retryable=exc.retryable)
         except errors.GuruError as exc:
+            LOGGER.warning("%s: %s %s", where, exc.code, exc.message)
             self._error(503, exc.code, exc.message)
         except (BrokenPipeError, ConnectionResetError):
             self.close_connection = True
-        except Exception:  # never hand internals to a browser
+        except Exception:  # never hand internals to a browser, but keep them for the log
+            LOGGER.exception("%s failed", where)
             self._error(500, "INTERNAL_ERROR", "the gateway hit an unexpected error")
 
     def do_GET(self) -> None:
@@ -280,10 +295,20 @@ class _Handler(BaseHTTPRequestHandler):
             return
         self._check_origin(required=False)
         self._check_session()
+        if url.path == "/":
+            from dev_guru.reports import render
+
+            self._send(200, render.live_page().encode(), "text/html; charset=utf-8")
+            return
         served = _STATIC.get(url.path)
         if served:
             page = (Path(__file__).parent / "static" / served[0]).read_bytes()
             self._send(200, page, served[1])
+            return
+        explorer = _EXPLORER.get(url.path)
+        if explorer:
+            asset = Path(__file__).resolve().parent.parent / "reports" / "assets" / explorer[0]
+            self._send(200, asset.read_bytes(), explorer[1])
             return
         self._api_get(url.path, query)
 
@@ -362,6 +387,10 @@ class _Handler(BaseHTTPRequestHandler):
                     **client.context_status(root),
                 }
             )
+        elif path == "/api/v1/explorer":
+            from dev_guru import service
+
+            self._json(service.explorer_model(root, client=client))
         elif path == "/api/v1/intel":
             self._json(self._latest_intel(root))
         elif path == "/api/v1/runs":

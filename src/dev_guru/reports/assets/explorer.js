@@ -1,10 +1,77 @@
-/* Dev Guru explorer. Offline and view-only: reads the embedded view model, never fetches, never executes.
+/* Dev Guru explorer. As a report it's offline and view-only: it reads the embedded view model, never fetches, never
+   executes. Under dev serve it asks the local gateway for the same model instead.
    Untrusted text (paths, names, docs, source) is only ever assigned through textContent or attributes. */
-(() => {
+(async () => {
   "use strict";
-  const D = JSON.parse(document.getElementById("dg-data").textContent);
-  const M = JSON.parse(document.getElementById("dg-manifest").textContent);
   const $ = (s) => document.querySelector(s);
+  const embedded = (id) => JSON.parse(document.getElementById(id)?.textContent || "null");
+  // dev serve: the page carries no data, and the gateway on this machine builds it
+  const LIVE = embedded("dg-live");
+  let D, M, WORKSPACE = null, WORKSPACES = [];
+  if (LIVE) {
+    $("#viewTitle").textContent = "Building the code graph…";
+    $("#viewDesc").textContent = "Ananke reads the code once for each change, so this is quicker next time.";
+    try {
+      const ask = async (path, options) => {
+        const r = await fetch(path, { credentials: "same-origin", ...options });
+        const body = await r.json();
+        if (!r.ok) throw Object.assign(new Error(body.error?.message || `the gateway said ${r.status}`), { code: body.error?.code });
+        return body;
+      };
+      WORKSPACES = (await ask("/api/v1/workspaces")).workspaces;
+      const wanted = new URLSearchParams(location.search).get("workspace");
+      WORKSPACE = (WORKSPACES.find((w) => w.id === wanted) || WORKSPACES[0]).id;
+      try {
+        ({ model: D, manifest: M } = await ask(`/api/v1/explorer?${new URLSearchParams({ workspace: WORKSPACE })}`));
+      } catch (e) {
+        if (e.code !== "GRAPH_MISSING") throw e;
+        // Reading never starts anything: building the graph is a run you ask for, and the page waits for it.
+        $("#viewTitle").textContent = "No code graph yet";
+        $("#viewDesc").textContent = "Ananke reads the code and builds it. Nothing is run, and nothing leaves this computer.";
+        const build = document.createElement("button");
+        build.className = "btn primary";
+        build.id = "build-graph";
+        build.textContent = "Build the code graph";
+        build.addEventListener("click", async () => {
+          build.disabled = true;
+          build.textContent = "Building…";
+          try {
+            const session = await ask("/api/v1/session");
+            const run = await ask("/api/v1/runs", { method: "POST", headers: { "Content-Type": "application/json", [session.csrf_header]: session.csrf_token },
+              body: JSON.stringify({ workspace: WORKSPACE, kind: "graph.build", parameters: {}, idempotency_key: crypto.randomUUID() }) });
+            for (;;) {
+              const now = await ask(`/api/v1/runs/${encodeURIComponent(run.run_id)}?${new URLSearchParams({ workspace: WORKSPACE })}`);
+              if (now.state === "succeeded") { location.reload(); return; }
+              if (!["queued", "running"].includes(now.state)) throw new Error(`the build ${now.state}`);
+              await new Promise((done) => setTimeout(done, 800));
+            }
+          } catch (problem) {
+            build.disabled = false;
+            build.textContent = "Try again";
+            $("#viewDesc").textContent = `It didn't finish: ${problem.message}.`;
+          }
+        });
+        const pages = document.createElement("a");
+        pages.href = `/app?${new URLSearchParams({ workspace: WORKSPACE })}`;
+        pages.className = "btn ghost";
+        pages.textContent = "Open the other pages";
+        $("#stageTools").replaceChildren(build, pages);
+        return;
+      }
+    } catch (e) {
+      $("#viewTitle").textContent = "The explorer couldn't load";
+      $("#viewDesc").textContent = `${e.message}. The other pages still work.`;
+      const open = document.createElement("a");
+      open.href = "/app";
+      open.className = "btn";
+      open.textContent = "Open the other pages";
+      $("#stageTools").replaceChildren(open);
+      return;
+    }
+  } else {
+    D = embedded("dg-data");
+    M = embedded("dg-manifest");
+  }
   const NS = "http://www.w3.org/2000/svg";
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -14,6 +81,7 @@
       if (v === undefined || v === null || v === false) continue;
       if (k === "text") n.textContent = String(v);
       else if (k === "class") n.className = v;
+      else if (k === "style") n.style.cssText = String(v); // through the style property, which a page policy allows
       else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
       else n.setAttribute(k, v === true ? "" : String(v));
     }
@@ -809,9 +877,9 @@
     documents: ["#/docs", "❏", "Documentation", "Decks and diagrams from your Markdown."],
     learning: ["#/learning", "✓", "Learning review", "What was learned, before it becomes reusable."],
   };
-  if (SERVE) {
-    window.DEV_GURU_REPORT = SERVE;
-    const hasNotebooks = (SERVE.intel.sections?.notebooks?.notebooks || []).length > 0;
+  if (SERVE || LIVE) {
+    if (SERVE) window.DEV_GURU_REPORT = SERVE;
+    const hasNotebooks = SERVE ? (SERVE.intel.sections?.notebooks?.notebooks || []).length > 0 : D.files.some((f) => String(f.path).endsWith(".ipynb"));
     for (const [id, [route, icon, label, desc]] of Object.entries(SERVE_VIEWS)) {
       if (id === "notebooks" && !hasNotebooks) continue;
       VIEWS[id] = { icon, label, desc, serve: route, draw: () => {} };
@@ -821,7 +889,7 @@
   const frameTheme = () => { try { frame.contentDocument.documentElement.dataset.theme = document.documentElement.dataset.theme === "day" ? "light" : "dark"; } catch { /* not loaded yet */ } };
   function openServe(route) {
     if (frameReady) { frameTheme(); frame.contentWindow.location.hash = route; return; }
-    if (frame.srcdoc) { frame.dataset.next = route; return; }
+    if (frame.srcdoc || frame.getAttribute("src")) { frame.dataset.next = route; return; }
     frame.dataset.next = route;
     frame.addEventListener("load", () => {
       frameReady = true;
@@ -834,7 +902,9 @@
         if (found && state.view !== found[0]) { state.view = found[0]; markTabs(found[0]); $("#viewTitle").textContent = found[1].label; syncHash(); }
       });
     }, { once: true });
-    frame.srcdoc = SHELL;
+    // under dev serve the pages are live, from this gateway; in a report they come from the recording
+    if (LIVE) frame.src = `/app?${new URLSearchParams({ workspace: WORKSPACE })}`;
+    else frame.srcdoc = SHELL;
   }
   if (D.repository && !SERVE) VIEWS.repository = { icon: "▤", label: "Repository", desc: "Every section of the repository analysis: components, routes, tables, flows, quality, coverage and vulnerabilities.", draw: drawRepository };
   function drawRepository() {
@@ -860,6 +930,11 @@
       ...part("End-to-end flows", ["Flow"], R.flows.map((f) => [f]), "repo-flows", held),
       ...part("Most complex functions", ["Function", "Complexity", "Where"], R.hotspots, "repo-hotspots", held),
       ...vulns);
+  }
+  if (LIVE && WORKSPACES.length > 1) {
+    const pick = el("select", { class: "btn ghost", "aria-label": "Workspace", onchange: (e) => { location.search = `?${new URLSearchParams({ workspace: e.target.value })}`; } },
+      ...WORKSPACES.map((w) => el("option", { value: w.id, text: w.name, ...(w.id === WORKSPACE ? { selected: true } : {}) })));
+    $(".top-actions").prepend(pick);
   }
   const tabs = $("#tabs");
   for (const [id, v] of Object.entries(VIEWS)) tabs.append(el("button", { class: `tab${id === "overview" ? " group-start" : ""}`, role: "tab", "data-view": id, "aria-selected": "false", onclick: () => { if (id !== "tour") { clearTimeout(tourTimer); $("#narration").hidden = true; } renderView(id); } }, el("span", { class: "ic", "aria-hidden": "true", text: v.icon }), v.label));
@@ -1121,7 +1196,7 @@
   $("#foot").replaceChildren(
     el("span", {}, el("b", { text: "Dev Guru " }), String(M.dev_guru)), el("span", {}, el("b", { text: "Ananke " }), String(M.ananke)),
     el("span", {}, el("b", { text: "revision " }), rev), el("span", {}, el("b", { text: "input " }), String(M.input_digest).slice(0, 19) + "…"),
-    el("span", {}, el("b", { text: "generated " }), String(M.generated_at)), el("span", { text: "offline · view-only" }),
+    el("span", {}, el("b", { text: "generated " }), String(M.generated_at)), el("span", { text: LIVE ? "live from dev serve, on this computer only" : "offline · view-only" }),
   );
   document.addEventListener("keydown", (e) => {
     const typing = /INPUT|TEXTAREA/.test(document.activeElement?.tagName || "");

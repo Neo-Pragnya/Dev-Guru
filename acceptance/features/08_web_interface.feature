@@ -28,7 +28,11 @@ Feature: The web interface is complete in what ships, and the run console holds 
               return r.status, dict(r.getheaders()), r.read()
           _, headers, _ = ask(login.path + "?" + login.query)
           me = headers["Set-Cookie"].split(";")[0]
-          _, _, page = ask("/", me)
+          _, _, home = ask("/", me)
+          assert b'id="dg-live">true' in home  # it opens on the explorer
+          status, _, script = ask("/explorer.js", me)
+          assert status == 200 and script == resources.files("dev_guru.reports").joinpath("assets", "explorer.js").read_bytes()
+          _, _, page = ask("/app", me)
           static = resources.files("dev_guru.gateway").joinpath("static")
           assert page == static.joinpath("index.html").read_bytes()
           linked = sorted(set(re.findall(r'(?:src|href)="(/[^"]+)"', page.decode())))
