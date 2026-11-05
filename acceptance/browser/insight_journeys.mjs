@@ -12,7 +12,7 @@ import { join, resolve } from "node:path";
 const HOSTILE_NAME = "<img src=x onerror=alert(1)>.py";
 const args = process.argv.slice(2);
 const shots = args.includes("--shots") ? resolve(args[args.indexOf("--shots") + 1]) : null;
-if (args.length && !shots) { console.error("usage: insight_journeys.mjs [--shots DIR] [--repo PATH]"); process.exit(2); }
+if (args.length && !shots && !args.includes("--network") && !args.includes("--repo")) { console.error("usage: insight_journeys.mjs [--shots DIR] [--repo PATH] [--network]"); process.exit(2); }
 const CHROME = process.env.CHROME || ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/usr/bin/google-chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser"].find(existsSync);
 if (!CHROME) { console.error("Chrome not found; set CHROME"); process.exit(2); }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -20,6 +20,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function buildWorkspace(root) {
   const from = args.includes("--repo") ? resolve(args[args.indexOf("--repo") + 1]) : join(import.meta.dirname, "..", "fixtures", "shop");
   cpSync(from, root, { recursive: true, filter: (p) => !/(^|\/)(node_modules|\.git|\.venv|venv|\.ananke|dist)(\/|$)/.test(p.slice(from.length)) });
+  if (!args.includes("--repo")) {
+    // a declared architecture that differs from the code, so the difference can be checked
+    mkdirSync(join(root, ".ananke", "architecture"), { recursive: true });
+    writeFileSync(join(root, ".ananke", "architecture", "system.calm.json"), JSON.stringify({ components: [{ id: "backend", name: "backend" }, { id: "payments", name: "payments" }], relationships: [] }));
+  }
   const git = (...a) => execFileSync("git", ["-C", root, ...a], { stdio: "ignore" });
   git("init", "-q"); git("add", "-A"); git("-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-qm", "init");
 }
@@ -234,6 +239,8 @@ if (expectGolden) await journey("the architecture is drawn from the inferred mod
   const column = (id) => evaluate(`Number(document.querySelector('#calm-diagram [data-component="${id}"]').dataset.column)`);
   expect((await column("frontend")) < (await column("backend")) && (await column("backend")) < (await column("db")), "the diagram doesn't read frontend, backend, db");
   expect((await evaluate(`document.querySelectorAll("#calm-diagram path.rel").length`)) === 3, "the links aren't all drawn");
+  const drift = await text("#calm-drift");
+  expect(drift.includes("payments") && drift.includes("Declared, but not found in the code"), `the declared model's difference isn't shown: ${drift.slice(0, 120)}`);
   const crossing = await linesThroughCards();
   expect(crossing === 0, `${crossing} lines run through a component`);
   expect(links.includes("frontend") && links.includes("backend") && links.includes("db"), links);
@@ -254,6 +261,19 @@ await journey("CVEs say they haven't been checked, not that they're clean, and m
   expect(await evaluate(`!!document.querySelector("#cves-unknown") && !document.querySelector("#cves-clean")`), "reads as clean");
   expect((await text("#main")).includes("osv.dev"), "doesn't say where a check would go");
   expect(requests.every((u) => u.startsWith(origin) || u.startsWith("data:") || u.startsWith("blob:")), "something was fetched elsewhere");
+});
+// Uses the network, so it runs only when asked: --network.
+if (args.includes("--network")) await journey("checking for CVEs finds the known ones, with fixes", async () => {
+  await route("#/cves");
+  await evaluate(`document.querySelector("#check-cves").click()`);
+  // the check runs as a run, and the page follows it
+  await until(`location.hash.startsWith("#/runs/") && /succeeded|failed/i.test(document.querySelector("#run-state .pill")?.textContent || "")`, "the check to finish", 180000);
+  expect(/succeeded/i.test(await evaluate(runState)), `the check ended: ${await evaluate(runState)}`);
+  await route("#/cves");
+  await shot("cves-found");
+  const list = await text("#cve-list");
+  expect(/jinja2/i.test(list), `jinja2's known CVEs aren't listed: ${list.slice(0, 160)}`);
+  expect(/\d+\.\d+/.test(list), "no fixed version is shown");
 });
 await journey("saving tokens shows a small map and the tools", async () => {
   await route("#/context");
