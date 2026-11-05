@@ -47,6 +47,7 @@
   const ROW = 19;
   const HEAD = 30;
 
+  const ARC_ROOM = 46;
   function erd(tables, relationships, onSelect) {
     // tables that share keys sit together, joined tables first
     const degree = new Map(tables.map((t) => [t.name, 0]));
@@ -73,7 +74,7 @@
     const byName = new Map(tables.map((t) => [t.name, t]));
     const columnsAcross = Math.max(1, Math.ceil(Math.sqrt(order.length)));
     const place = new Map();
-    const heights = Array(columnsAcross).fill(20);
+    const heights = Array(columnsAcross).fill(ARC_ROOM);
     order.forEach((name, i) => {
       const x = i % columnsAcross;
       const visible = Math.min(byName.get(name).columns.length, 10);
@@ -87,6 +88,15 @@
       const from = place.get(r.from_table);
       const to = place.get(r.to_table);
       if (!from || !to || r.from_table === r.to_table) continue;
+      // cards with a column between them join by an arc over the top, rather than a line through what's between
+      if (Math.abs(from.x - to.x) > CARD_WIDTH + 90) {
+        const a = from.x + CARD_WIDTH / 2;
+        const b = to.x + CARD_WIDTH / 2;
+        const lift = Math.min(from.y, to.y) - ARC_ROOM + 2;
+        lines.append(svg("path", { d: `M${a} ${from.y} C${a} ${lift} ${b} ${lift} ${b} ${to.y}`, class: `rel${r.origin === "inferred" ? " inferred" : ""}`, "marker-end": "url(#one)", "marker-start": r.cardinality === "one-to-one" ? "url(#one)" : "url(#many)" },
+          svg("title", { text: `${r.from_table}.${r.from_column} to ${r.to_table}.${r.to_column}, ${r.cardinality}` })));
+        continue;
+      }
       // cards in one column join by an arc out to the right, rather than a line looping through them both
       const sameColumn = from.x === to.x;
       const leftToRight = from.x < to.x;
@@ -350,7 +360,7 @@
       } else {
         const counts = Object.keys(RANK).map((name) => [name, found.filter((v) => v.severity === name).length]).filter(([, n]) => n);
         root.append(el("div", { class: "cards", id: "cve-counts" }, ...counts.map(([name, n]) => stat(n, name))),
-          table("cve-list", ["Package", "Version", "Severity", "Advisory", "Fixed in", "Summary"], found.map((v) => [v.package, v.version, el("span", { class: `pill sev-${v.severity}`, text: v.severity }), [v.id, ...(v.aliases || []).filter((a) => a.startsWith("CVE"))].join(", "), v.fixed_in || "no fix known", v.summary])));
+          table("cve-list", ["Package", "Version", "Severity", "Advisory", "Fixed in", "Summary"], found.map((v) => [v.package, v.version, el("span", { class: `pill sev-${v.severity}`, text: v.severity }), [v.id, ...(v.aliases || []).filter((a) => a.startsWith("CVE"))].join(", "), v.fixed_in || "no fix known", String(v.summary || "").length > 180 ? `${String(v.summary).slice(0, 180)}...` : v.summary])));
       }
       root.append(check);
     }

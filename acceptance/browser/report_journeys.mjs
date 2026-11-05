@@ -166,8 +166,11 @@ await journey("every page of dev serve is in the file, works, and fetches nothin
     const look = async (id, expr, what) => { await evaluate(`document.querySelector('.tab[data-view="${id}"]').click()`); await sleep(500); expect(await inner(expr), what); };
     await look("codemap", `doc.querySelectorAll(".graph .edge").length > 5`, "the code map has no links");
     await look("data", `doc.querySelectorAll(".table-card").length >= 4 && doc.querySelector("#main").textContent.includes("churn_scores")`, "the ERD is missing tables, including one written in a notebook");
+    const crossed = await inner(`(() => { const cards = [...doc.querySelectorAll(".table-card")].map((c) => c.getBoundingClientRect()); return [...doc.querySelectorAll("path.rel")].filter((line) => { const n = line.getTotalLength(); for (let i = 2; i < 19; i++) { const p = line.getPointAtLength((n * i) / 20).matrixTransform(line.getScreenCTM()); if (cards.some((c) => p.x > c.left + 2 && p.x < c.right - 2 && p.y > c.top + 2 && p.y < c.bottom - 2)) return true; } return false; }).length; })()`);
+    expect(crossed === 0, `${crossed} lines run through a table`);
     await look("apis", `doc.querySelector("#main").textContent.includes("/churn/{customer_id}")`, "a route written in a notebook isn't listed");
     await look("cves", `doc.querySelectorAll("#cve-list tbody tr").length > 0`, "no CVEs with fixes");
+    expect(await inner(`(() => { const h = doc.querySelector("#cve-list th"); return h.getBoundingClientRect().height < 40; })()`), "the CVE table's headings break up");
     await look("architecture", `doc.querySelectorAll("#calm-diagram path.rel").length >= 3`, "the architecture has no links");
     await look("notebooks", `doc.querySelector("#notebook-title")?.textContent.startsWith("Week 1") && doc.querySelector("#notebook-outline li") !== null`, "the first notebook isn't explained");
     await inner(`doc.querySelector("#notebook-next").click()`);
