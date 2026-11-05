@@ -112,12 +112,12 @@ def _serve_shell() -> str:
     static = Path(__file__).resolve().parent.parent / "gateway" / "static"
     text = (static / "index.html").read_text(encoding="utf-8")
     text = re.sub(r"<link rel=\"icon\"[^>]*>\n?", "", text)
-    for name in ("app.css", "map.css", "insights.css"):
+    for name in ("app.css", "map.css", "insights.css", "lantern.css"):
         link = f'<link rel="stylesheet" href="/{name}">'
         text = text.replace(link, f"<style>{(static / name).read_text(encoding='utf-8')}</style>")
     host = (static / "static_host.js").read_text(encoding="utf-8")
     scripts = f"<script>{host}</script>"
-    for name in ("app.js", "map.js", "insights.js", "studio.js"):
+    for name in ("app.js", "lantern.js", "map.js", "insights.js", "studio.js"):
         text = text.replace(f'<script src="/{name}" defer></script>', "")
         scripts += f"<script>{(static / name).read_text(encoding='utf-8')}</script>"
     return text.replace("</body>", f"{scripts}</body>")

@@ -8,7 +8,9 @@
 <link rel="stylesheet" href="/app.css">
 <link rel="stylesheet" href="/map.css">
 <link rel="stylesheet" href="/insights.css">
+<link rel="stylesheet" href="/lantern.css">
 <script src="/app.js" defer></script>
+<script src="/lantern.js" defer></script>
 <script src="/map.js" defer></script>
 <script src="/insights.js" defer></script>
 <script src="/studio.js" defer></script>
@@ -17,12 +19,6 @@
 <a class="skip" href="#main">Skip to content</a>
 <header class="top">
   <a class="brand" href="#/"><span class="flame" aria-hidden="true"></span>Dev Guru</a>
-  <label class="field">Workspace <select id="workspace"></select></label>
-  <span id="harness" class="pill" role="status"></span>
-  <button id="theme" class="ghost" type="button">Theme</button>
-</header>
-<div id="banner" class="banner" role="status" aria-live="polite" hidden></div>
-<div class="layout">
   <nav aria-label="Main">
     <p class="nav-title">Available</p>
     <a href="#/" data-route="">Overview</a>
@@ -45,7 +41,15 @@
     <a href="#/docs" data-route="docs">Documentation</a>
     <a href="#/learning" data-route="learning">Learning review</a>
   </nav>
+  <label class="field">Workspace <select id="workspace"></select></label>
+  <span id="harness" class="pill" role="status"></span>
+  <button id="theme" class="ghost" type="button">Theme</button>
+</header>
+<div id="banner" class="banner" role="status" aria-live="polite" hidden></div>
+<div class="layout">
+  <aside id="rail" class="rail" aria-label="In this view"></aside>
   <main id="main" tabindex="-1"></main>
+  <aside id="dock" class="dock" aria-label="Details" aria-live="polite"></aside>
 </div>
 <noscript><p>This interface needs JavaScript. The <code>dev</code> commands work without it.</p></noscript>
 </body>

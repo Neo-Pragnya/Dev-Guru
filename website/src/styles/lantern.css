@@ -119,3 +119,10 @@ a { text-decoration-color: color-mix(in srgb, var(--link) 40%, transparent); }
 .pypi-chip span, .pypi-chip strong { padding: 9px 11px; }
 .pypi-chip span { background: rgb(128 128 128 / 14%); color: inherit; }
 .pypi-chip strong { background: linear-gradient(180deg, #f6b65c, #e8923c); color: #1a1208; }
+.mini .grow { transform-box: fill-box; transform-origin: left; animation: dg-grow-x 3s ease-in-out infinite; }
+.mini .spin { transform-box: fill-box; transform-origin: center; animation: dg-spin 12s linear infinite; }
+.mini .spin.b { animation-duration: 22s; animation-direction: reverse; }
+@keyframes dg-grow-x { 0%, 100% { transform: scaleX(.72); } 50% { transform: scaleX(1); } }
+@keyframes dg-spin { to { transform: rotate(360deg); } }
+/* 25 views sit in a full square on a wide screen */
+@media (min-width: 1200px) { .views { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; } .view-card svg { height: 96px; } }

@@ -891,7 +891,22 @@
     inspect(state.sel);
     syncHash();
   }
-  function markTabs(id) { tabs.querySelectorAll(".tab").forEach((t) => t.setAttribute("aria-selected", String(t.dataset.view === id))); }
+  function markTabs(id) {
+    tabs.querySelectorAll(".tab").forEach((t) => {
+      const on = t.dataset.view === id;
+      t.setAttribute("aria-selected", String(on));
+      if (on && document.documentElement.classList.contains("embed")) tabs.scrollLeft = t.offsetLeft - tabs.offsetLeft - 40;
+    });
+  }
+  // Framed on a page with #play=1, it shows each view in turn until someone reaches for it.
+  function playViews() {
+    const ids = Object.keys(VIEWS).filter((id) => id !== "tour");
+    let at = Math.max(0, ids.indexOf(state.view));
+    const timer = setInterval(() => { at = (at + 1) % ids.length; renderView(ids[at]); }, 5200);
+    const stop = () => clearInterval(timer);
+    for (const name of ["pointerdown", "keydown", "wheel"]) addEventListener(name, stop, { once: true, passive: true });
+    frame.addEventListener("load", () => { for (const name of ["pointerdown", "keydown", "wheel"]) frame.contentWindow.addEventListener(name, stop, { once: true, passive: true }); });
+  }
   function toolsFor(id) {
     const box = $("#stageTools"); box.replaceChildren();
     const keys = id === "constellation" || id === "flow" ? ["imports"] : id === "calls" ? ["calls", "inherits"] : [];
@@ -1124,7 +1139,10 @@
   window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (state.view === "hotspots") drawHotspots(); else if (space.active) { sizeSpace(); wake(); } else fit(); }, 150); });
 
   buildSidebar();
+  // read before the first view rewrites the address
+  const playing = new URLSearchParams(location.hash.slice(1)).get("play") === "1" && !reduced;
   renderView(state.view);
+  if (playing) playViews();
   if (state.sel) select(state.sel);
   window.__devGuru = { state, D, M, renderView, select, find, space: spaceProbe };
 })();

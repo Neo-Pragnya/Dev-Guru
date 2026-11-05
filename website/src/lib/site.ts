@@ -173,7 +173,7 @@ export const STATS: { label: string; value: string; tint: string }[] = [
   },
   {
     "label": "Browser journeys per release",
-    "value": "54",
+    "value": "55",
     "tint": "lilac"
   }
 ];

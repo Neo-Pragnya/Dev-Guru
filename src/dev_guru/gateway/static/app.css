@@ -1,16 +1,23 @@
 /* Dev Guru "Lantern": warm parchment by day, plum-black lit by a flame at night. */
 :root {
-  color-scheme: light dark;
-  --bg: #fbf4e6; --surface: #fffaf1; --surface-2: #f5e9d2; --ink: #2a1d14; --muted: #6d5a49; --line: #e3cfab;
-  --link: #a33f0c; --ok: #0b6157; --bad: #a62a1a; --warn: #7a4900; --ok-soft: #d6f3ee; --bad-soft: #fde3dc; --warn-soft: #fff0d4;
+  color-scheme: light;
+  --bg: #fbf6ec; --surface: #ffffff; --surface-2: #f4ecdc; --raise: #fff7ea; --panel: rgba(255, 255, 255, .9); --panel-solid: #ffffff;
+  --ink: #1e1c33; --muted: #5e5a7a; --faint: #a19cb8; --line: rgba(40, 30, 90, .12); --line-2: rgba(40, 30, 90, .22);
+  --saffron: #d97a00; --ember: #d9481c; --teal: #0e9b8d; --violet: #6a52e0; --rose: #d43d68; --lime: #4f8f0b;
+  --glow: 0 0 0 1px rgba(217, 122, 0, .4), 0 0 18px rgba(217, 122, 0, .18); --shadow: 0 14px 40px rgba(60, 40, 10, .14); --sel: rgba(217, 122, 0, .14);
+  --link: #a85400; --ok: #0b6157; --bad: #a62a1a; --warn: #7a4900; --ok-soft: #d6f3ee; --bad-soft: #fde3dc; --warn-soft: #fff0d4;
   --flame: linear-gradient(135deg, #ffd27a, #ffb347 35%, #ff6b3d 75%, #e94f7a);
-  --display: Georgia, "Times New Roman", serif;
-  --body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --display: inherit;
+  --body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 :root[data-theme="dark"] {
-  --bg: #0f0b13; --surface: #1a121f; --surface-2: #241a2b; --ink: #f6ecdf; --muted: #bfae9f; --line: #3a2a41;
-  --link: #ffbe73; --ok: #7fe6d8; --bad: #ffb197; --warn: #ffd58e; --ok-soft: #0e2f2b; --bad-soft: #3a1b12; --warn-soft: #3a2a10;
+  color-scheme: dark;
+  --bg: #0b0c18; --surface: #15172f; --surface-2: #10122a; --raise: #1d2042; --panel: rgba(22, 24, 48, .86); --panel-solid: #15172f;
+  --ink: #eceaf8; --muted: #a9abd0; --faint: #63668e; --line: rgba(160, 165, 255, .12); --line-2: rgba(160, 165, 255, .22);
+  --saffron: #ffb347; --ember: #ff6b3d; --teal: #3dd6c6; --violet: #9b87ff; --rose: #ff6f91; --lime: #b7ef6a;
+  --glow: 0 0 0 1px rgba(255, 179, 71, .35), 0 0 22px rgba(255, 140, 50, .25); --shadow: 0 18px 50px rgba(0, 0, 0, .45); --sel: rgba(255, 179, 71, .18);
+  --link: #ffb347; --ok: #7fe6d8; --bad: #ffb197; --warn: #ffd58e; --ok-soft: #0e2f2b; --bad-soft: #3a1b12; --warn-soft: #3a2a10;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; }
@@ -72,6 +79,5 @@ code, .mono { font: 13px var(--mono); overflow-wrap: anywhere; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; transition: none !important; } }
 /* inside a report, the report's own tabs replace this shell */
-.in-report .top, .in-report nav, .in-report .skip { display: none; }
-.in-report .layout { display: block; }
+.in-report .skip { display: none; }
 

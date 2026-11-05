@@ -32,6 +32,30 @@ def main() -> int:
             "*.pins"
         ):  # old on purpose, and kept out of this repository as manifests
             pinned.rename(pinned.with_suffix(""))
+        studio = REPOSITORY / "acceptance" / "fixtures" / "studio"
+        shutil.copytree(studio / "skills", shop / "skills")
+        shutil.copytree(studio / "docs", shop / "docs")
+        (shop / ".ananke").mkdir(exist_ok=True)
+        (shop / ".ananke" / "config.toml").write_text(
+            '[capability_sources.team]\nroot = "skills"\nnamespace = "shop"\n', encoding="utf-8"
+        )
+        subprocess.run(
+            [
+                "ananke",
+                "learning",
+                "capture",
+                "refund-checks",
+                "--description",
+                "Test a refund against the payment it came from.",
+                "--body",
+                str(studio / "lessons" / "refund-checks.md"),
+                "--case",
+                "paid-order:positive:python3 -c pass",
+            ],
+            cwd=shop,
+            check=True,
+            capture_output=True,
+        )
         subprocess.run(["git", "init", "-q", str(shop)], check=True)
         subprocess.run(
             [

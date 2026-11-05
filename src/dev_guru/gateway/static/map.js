@@ -2,11 +2,11 @@
 "use strict";
 
 (() => {
-  const { el, api, scoped, page, showError, views, withAnalysis } = window.DevGuru;
+  const { el, api, scoped, page, showError, views, withAnalysis, lantern: L } = window.DevGuru;
   const SVG = "http://www.w3.org/2000/svg";
   const WIDTH = 190;
   const HEIGHT = 46;
-  const GAP_X = 90;
+  const GAP_X = 50;
   const GAP_Y = 18;
 
   const svg = (tag, attrs, ...children) => {
@@ -60,7 +60,7 @@
     }
     const columns = [];
     for (const n of nodes) {
-      const at = layer.get(n.id) || 0;
+      const at = n.column ?? (layer.get(n.id) || 0); // a page may know the columns it wants
       (columns[at] = columns[at] || []).push(n.id);
     }
     const order = new Map();
@@ -123,7 +123,7 @@
       const at = position.get(node.id);
       const box = svg("g", { class: `node node-${node.kind}${node.neighbour ? " neighbour" : ""}`, transform: `translate(${at.x} ${at.y})`, tabindex: "0", role: "button", "aria-label": `${node.kind} ${node.label}` },
         svg("rect", { width: WIDTH, height: HEIGHT, rx: 9 }),
-        svg("text", { x: 10, y: 19, class: "node-label", text: short(node.label, 25) }),
+        svg("text", { x: 10, y: 19, class: "node-label", text: short(node.label, 24) }),
         svg("text", { x: 10, y: 35, class: "node-sub", text: short(node.sub || node.kind, 29) }));
       box.dataset.id = node.id;
       box.addEventListener("click", () => onSelect(node));
@@ -135,11 +135,11 @@
     }
     canvas.append(svg("defs", {}, svg("marker", { id: "arrow", viewBox: "0 0 8 8", refX: 7, refY: 4, markerWidth: 7, markerHeight: 7, orient: "auto-start-reverse" },
       svg("path", { d: "M0 0L8 4L0 8z", class: "arrow-head" }))), lines, boxes);
-    const highlight = (ids) => {
-      for (const [id, box] of shapes) box.classList.toggle("dim", ids !== null && !ids.has(id));
-      for (const line of paths) line.classList.toggle("dim", ids !== null && !(ids.has(line.dataset.source) && ids.has(line.dataset.target)));
-      for (const [id, box] of shapes) box.classList.toggle("selected", ids !== null && ids.size === 1 && ids.has(id));
-      if (ids !== null && ids.size === 1) keepInView(shapes.get([...ids][0]));
+    const lit = L.fx(canvas);
+    const highlight = (ids, current) => {
+      const main = current ?? (ids !== null && ids.size === 1 ? [...ids][0] : undefined);
+      lit.pin(ids, main);
+      if (main !== undefined) keepInView(shapes.get(main));
     };
     return { canvas, highlight };
   }
@@ -157,6 +157,12 @@
   function panZoom(canvas) {
     const [, , fullWidth, fullHeight] = canvas.getAttribute("viewBox").split(" ").map(Number);
     let scale = 1;
+    const room = () => {
+      const frame = canvas.parentElement;
+      if (!frame || !frame.isConnected) return fullWidth;
+      const style = getComputedStyle(frame);
+      return frame.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    };
     // zooming resizes the drawing and its frame scrolls, so text stays readable and nothing is cut off
     const apply = () => {
       canvas.setAttribute("width", fullWidth * scale);
@@ -165,16 +171,33 @@
     const button = (text, label, fn) => el("button", { type: "button", class: "ghost", text, "aria-label": label, on: { click: fn } });
     // start as close to the whole map as still leaves the labels readable
     requestAnimationFrame(() => {
-      const room = canvas.parentElement ? canvas.parentElement.clientWidth : fullWidth;
-      scale = Math.max(0.75, Math.min(1, room / fullWidth));
+      scale = Math.max(0.62, Math.min(1, room() / fullWidth));
       apply();
+      const frame = canvas.parentElement;
+      if (!frame || frame.dataset.draggable) return;
+      frame.dataset.draggable = "yes";
+      // drag the background to move around, and hold Ctrl or Cmd to zoom with the wheel
+      frame.addEventListener("pointerdown", (start) => {
+        if (start.target.closest("[data-id], button, a")) return;
+        const from = { x: frame.scrollLeft, y: frame.scrollTop, px: start.clientX, py: start.clientY };
+        frame.classList.add("dragging");
+        const move = (e) => { frame.scrollLeft = from.x - (e.clientX - from.px); frame.scrollTop = from.y - (e.clientY - from.py); };
+        const stop = () => { frame.classList.remove("dragging"); removeEventListener("pointermove", move); removeEventListener("pointerup", stop); };
+        addEventListener("pointermove", move);
+        addEventListener("pointerup", stop);
+      });
+      frame.addEventListener("wheel", (e) => {
+        if (!e.ctrlKey && !e.metaKey) return;
+        e.preventDefault();
+        scale = Math.max(0.4, Math.min(4, scale * (e.deltaY < 0 ? 1.12 : 0.89)));
+        apply();
+      }, { passive: false });
     });
     return el("div", { class: "row zoom" },
-      button("−", "Zoom out", () => { scale = Math.max(0.4, scale / 1.25); apply(); }),
       button("+", "Zoom in", () => { scale = Math.min(4, scale * 1.25); apply(); }),
-      button("Fit", "Fit the whole map", () => {
-        const room = canvas.parentElement ? canvas.parentElement.clientWidth : fullWidth;
-        scale = Math.max(0.4, Math.min(1, room / fullWidth));
+      button("−", "Zoom out", () => { scale = Math.max(0.4, scale / 1.25); apply(); }),
+      button("⤢", "Fit the whole drawing", () => {
+        scale = Math.max(0.4, Math.min(1, room() / fullWidth));
         apply();
       }));
   }
@@ -197,6 +220,7 @@
 
   window.DevGuru.drawGraph = drawGraph;
   window.DevGuru.panZoom = panZoom;
+  window.DevGuru.showSource = showSource;
 
   views.map = async (main, query) => {
     page("Code map", "How this repository connects. Open a folder to see its files, and a file to see its functions.");
@@ -274,7 +298,7 @@
       root.append(el("p", { class: "muted", id: "map-summary",
         text: `${nodes.length} items and ${edges.length} links shown${crossing ? `, including ${crossing} HTTP calls and table uses` : ""}. ${a.external_imports} imports of third-party packages aren't drawn.${report || collapse === "none" ? "" : " Analyse the repository to see HTTP calls and tables here."}` }));
       if (!path) {
-        root.append(el("label", { class: "field" }, "Folder depth", el("select", { id: "map-depth", on: { change: (e) => { location.hash = `#/map?depth=${e.target.value}`; } } },
+        L.tools(el("label", { class: "field" }, "Folder depth", el("select", { id: "map-depth", on: { change: (e) => { location.hash = `#/map?depth=${e.target.value}`; } } },
           ...[1, 2, 3, 4].map((d) => el("option", { value: String(d), text: String(d), selected: d === depth })))));
       }
 
@@ -287,7 +311,10 @@
       const allKinds = [...new Set(edges.flatMap((e) => e.kinds))].sort();
       const hidden = new Set();
 
-      const stage = el("div", { class: "stage", id: "map-stage" });
+      const KIND_TONES = { imports: "violet", calls: "teal", reads: "lime", writes: "rose", http: "saffron", inherits: "ember" };
+      const frame = L.stage({ id: "map-stage", legend: allKinds.filter((k) => KIND_TONES[k]).map((k) => [k, KIND_TONES[k]]), hint: "Hover to light up what connects. Click to inspect." });
+      const stage = frame.body;
+      let railList = null;
       let graph = null;
       let selected = null;
       const open = (node) => {
@@ -343,7 +370,8 @@
       const select = (node) => {
         const incoming = edges.filter((e) => e.target === node.id);
         const outgoing = edges.filter((e) => e.source === node.id);
-        graph.highlight(new Set([node.id, ...incoming.map((e) => e.source), ...outgoing.map((e) => e.target)]));
+        graph?.highlight(new Set([node.id, ...incoming.map((e) => e.source), ...outgoing.map((e) => e.target)]), node.id);
+        railList?.select(node.id);
         const label = (id) => nodes.find((n) => n.id === id)?.label || id;
         const list = (title, rows) => (rows.length
           ? [el("h3", { text: title }), el("ul", {}, ...rows.map((r) => el("li", { text: r })))] : []);
@@ -362,12 +390,12 @@
         const shown = edges.filter((e) => e.kinds.some((k) => !hidden.has(k)));
         stage.replaceChildren();
         if (!connected.length) {
-          stage.append(el("p", { class: "muted", text: "Nothing here connects. See the unconnected list below." }));
+          stage.append(L.waiting("Nothing here connects. See the unconnected list below."));
           return;
         }
         graph = drawGraph({ nodes: connected, edges: shown, onSelect: (node) => { if (selected === node.id && (node.kind === "directory" || node.kind === "file")) open(node); else { selected = node.id; select(node); } }, label: `Map of ${path || "this repository"}` });
         const wrap = el("div", { class: "canvas-wrap" }, graph.canvas);
-        stage.append(panZoom(graph.canvas), wrap);
+        stage.append(wrap, panZoom(graph.canvas));
       };
       const chips = el("div", { class: "row", id: "edge-filters", role: "group", "aria-label": "Show links by kind" },
         ...allKinds.map((kind) => {
@@ -379,16 +407,23 @@
           });
           return chip;
         }));
-      root.append(chips);
-      if (connected.length) {
-        const openAll = el("div", { class: "row" }, el("label", { class: "field" }, "Open",
-          el("select", { id: "map-open", on: { change: (e) => { const n = nodes.find((x) => x.id === e.target.value); if (n) open(n); } } },
-            el("option", { value: "", text: "a folder or file…" }),
-            ...nodes.filter((n) => n.kind === "directory" || n.kind === "file").map((n) => el("option", { value: n.id, text: n.path || n.label })))));
-        if (nodes.some((n) => n.kind === "directory" || n.kind === "file")) root.append(openAll);
-      }
-      root.append(el("div", { class: "map-layout" }, stage, inspector));
+      L.tools(chips);
+      root.append(frame.el);
+      L.dock(inspector);
       render();
+      const degree = new Map();
+      for (const e of edges) for (const id of [e.source, e.target]) degree.set(id, (degree.get(id) || 0) + 1);
+      const busiest = [...connected].sort((x, y) => (degree.get(y.id) || 0) - (degree.get(x.id) || 0));
+      const pick = (id) => { const n = nodes.find((x) => x.id === id); if (n) { selected = n.id; select(n); } };
+      const grouped = (title, test) => ({ title, items: nodes.filter(test).map((n) => ({ id: n.id, label: n.label, sub: n.path && n.path !== n.label ? n.path : undefined, count: degree.get(n.id) || 0, tone: n.kind === "table" ? "teal" : (n.neighbour ? "faint" : (n.kind === "directory" ? "saffron" : "violet")) })) });
+      railList = L.rail({ search: true, placeholder: "Find a folder, file or table", onSelect: pick,
+        insights: [busiest[0] ? { title: "Most connected", text: busiest[0].label, onClick: () => pick(busiest[0].id) } : null,
+          path ? { title: "Back", text: "All folders", href: "#/map" } : null],
+        groups: [grouped("Folders", (n) => n.kind === "directory"), grouped("Files", (n) => n.kind === "file"), grouped("Tables", (n) => n.kind === "table"), grouped("Symbols", (n) => !["directory", "file", "table"].includes(n.kind))] });
+      inspector.replaceChildren(L.detail({ title: path || "This repository", where: path ? "A part of the repository" : "Everything, by folder", note: "Hover anything to light up what it connects to. Select it to see its impact, and a path to anything else.",
+        facts: [[nodes.length, "Items"], [edges.length, "Links"], [crossing, "Crossings"]] },
+      ...L.linkList("Most connected", busiest.slice(0, 6).map((n) => el("button", { type: "button", class: "ghost link", text: `${n.label}, ${degree.get(n.id)} links`, on: { click: () => pick(n.id) } })))));
+      L.walk({ into: frame.el, go: pick, steps: busiest.slice(0, 8).map((n) => ({ id: n.id, text: `${n.label} has ${degree.get(n.id)} ${degree.get(n.id) === 1 ? "link" : "links"} in this view.` })) });
 
       if (alone.length) {
         root.append(el("h2", { text: `Not connected (${alone.length})` }),
@@ -413,27 +448,22 @@
     await withAnalysis(root, (report) => {
       const section = report.sections.flows;
       const api_ = report.sections.api;
-      if (section.status !== "found") {
+      if (section.status !== "found" || !(section.flows || []).length) {
+        L.nothing(root, "No flows found.", "No flows were found. This repository may have no HTTP routes this analysis can read.");
         root.append(el("p", { class: "muted", id: "flows-empty", text: "No flows were found. This repository may have no HTTP routes this analysis can read." }));
         for (const limit of section.limits || []) root.append(el("p", { class: "muted", text: limit }));
         return;
       }
       const broken = (api_.unmatched_clients || []).filter((c) => !c.base_unknown && !c.external);
-      if (broken.length) {
-        root.append(el("div", { class: "card warn-card", id: "unmatched-calls" }, el("h2", { text: `Calls to routes that don't exist here (${broken.length})` }),
-          el("ul", {}, ...broken.map((c) => el("li", {}, el("code", { text: `${c.method} ${c.path}` }), ` from ${c.evidence}`)))));
-      }
       const flows = section.flows || [];
       const wanted = query.get("flow");
-      const filter = el("input", { type: "search", id: "flow-search", placeholder: "Find a flow", "aria-label": "Find a flow" });
-      const picker = el("select", { id: "flow-picker", "aria-label": "Flow" });
-      const stage = el("div", { id: "flow-stage" });
-      const fill = () => {
-        const words = filter.value.toLowerCase();
-        picker.replaceChildren(...flows.filter((f) => f.name.toLowerCase().includes(words)).map((f) => el("option", { value: f.id, text: f.name })));
-      };
+      const frame = L.stage({ id: "flow-stage", legend: [["calls", "saffron"], ["reads", "teal"], ["writes", "rose"], ["over HTTP", "ember"]], hint: "Each step lights the way it came." });
+      const stage = frame.body;
+      const below = el("div", { id: "flow-below" });
+      let current = { go: () => {}, index: 0 };
       const showFlow = (flow) => {
         stage.replaceChildren();
+        below.replaceChildren();
         if (!flow) return;
         const nodes = flow.steps.map((s) => ({ id: s.node, kind: s.kind === "table" ? "table" : s.kind, label: s.label, sub: s.access || s.kind, raw: s }));
         const known = new Set(nodes.map((n) => n.id));
@@ -441,44 +471,51 @@
           source: e.source, target: e.target, kind: e.kind, kindLabel: e.kind, inferred: e.origin === "inferred",
         }));
         const detail = el("aside", { class: "inspector", id: "flow-detail", "aria-live": "polite" });
-        let index = 0;
+        L.dock(detail);
         let graph = null;
-        const steps = el("ol", { class: "steps", id: "flow-steps" });
+        const steps = el("ol", { class: "steps flow-strip", id: "flow-steps" });
         const go = (to) => {
-          index = Math.max(0, Math.min(flow.steps.length - 1, to));
-          const step = flow.steps[index];
-          graph.highlight(new Set([step.node]));
+          current.index = Math.max(0, Math.min(flow.steps.length - 1, to));
+          const step = flow.steps[current.index];
+          graph.highlight(new Set(flow.steps.slice(0, current.index + 1).map((s) => s.node)), step.node);
           for (const [i, row] of [...steps.children].entries()) {
-            if (i === index) row.setAttribute("aria-current", "step"); else row.removeAttribute("aria-current");
+            if (i === current.index) row.setAttribute("aria-current", "step"); else row.removeAttribute("aria-current");
           }
-          detail.replaceChildren(el("h2", { text: step.label }), el("p", { class: "muted", text: `Step ${index + 1} of ${flow.steps.length}: ${step.kind}${step.access ? `, ${step.access}` : ""}` }),
-            el("p", { class: "mono", text: step.evidence || "" }));
-          if (step.evidence) showSource(detail, step.evidence);
+          detail.replaceChildren(el("h2", { text: step.label }), el("p", { class: "muted", text: `Step ${current.index + 1} of ${flow.steps.length}: ${step.kind}${step.access ? `, ${step.access}` : ""}` }),
+            el("p", { class: "mono ins-path", text: step.evidence || "" }));
+          if (step.evidence) window.DevGuru.showSource(detail, step.evidence);
         };
+        current = { go, index: 0 };
         graph = drawGraph({ nodes, edges, label: `Flow ${flow.name}`, onSelect: (node) => go(flow.steps.findIndex((s) => s.node === node.id)) });
         flow.steps.forEach((step, i) => steps.append(el("li", {},
           el("button", { type: "button", class: "ghost", text: `${step.label}${step.access ? ` (${step.access})` : ""}`, on: { click: () => go(i) } }))));
         const reaches = flow.steps.some((s) => s.kind === "table");
         const called = flow.steps.some((s) => s.kind === "client");
-        stage.append(el("p", { class: "muted", id: "flow-note", text: [
+        stage.append(el("div", { class: "canvas-wrap" }, graph.canvas), panZoom(graph.canvas));
+        below.append(steps, el("p", { class: "muted", id: "flow-note", text: [
           called ? "Called from this repository." : "No caller found in this repository.",
           reaches ? "Reaches a data store." : "No data store found on this path.",
           flow.truncated ? "Cut short at the size limit." : "",
-        ].filter(Boolean).join(" ") }),
-        panZoom(graph.canvas), el("div", { class: "row" },
-          el("button", { type: "button", class: "ghost", id: "flow-prev", text: "Previous step", on: { click: () => go(index - 1) } }),
-          el("button", { type: "button", class: "ghost", id: "flow-next", text: "Next step", on: { click: () => go(index + 1) } })),
-        el("div", { class: "canvas-wrap" }, graph.canvas), el("div", { class: "map-layout" }, steps, detail));
+        ].filter(Boolean).join(" ") }));
+        L.walk({ into: frame.el, go: (id) => go(flow.steps.findIndex((s) => s.node === id)), steps: flow.steps.map((s) => ({ id: s.node, text: `${s.label}: ${s.kind}${s.access ? `, ${s.access}` : ""}${s.evidence ? `, at ${s.evidence}` : ""}.` })) });
         go(0);
       };
-      const pick = () => showFlow(flows.find((f) => f.id === picker.value));
-      filter.addEventListener("input", () => { fill(); pick(); });
-      picker.addEventListener("change", pick);
-      fill();
-      if (wanted && flows.some((f) => f.id === wanted)) picker.value = wanted;
-      root.append(el("div", { class: "row" }, filter, picker), stage);
+      L.tools(
+        el("button", { type: "button", class: "chip", id: "flow-prev", text: "‹ Previous step", on: { click: () => current.go(current.index - 1) } }),
+        el("button", { type: "button", class: "chip", id: "flow-next", text: "Next step ›", on: { click: () => current.go(current.index + 1) } }));
+      const first = wanted && flows.some((f) => f.id === wanted) ? wanted : flows[0]?.id;
+      const list = L.rail({ search: true, searchId: "flow-search", placeholder: "Find a flow",
+        insights: broken.length ? [{ title: "Calls that lead nowhere", text: `${broken.length} to routes that don't exist here`, onClick: () => document.querySelector("#unmatched-calls")?.scrollIntoView({ block: "nearest" }) }] : [],
+        groups: [{ title: "Flows", items: flows.map((f) => ({ id: f.id, label: f.name, sub: `${f.steps.length} steps`, tone: f.steps.some((s) => s.kind === "table") ? "teal" : "saffron" })) }],
+        onSelect: (id) => showFlow(flows.find((f) => f.id === id)) });
+      root.append(frame.el, below);
+      if (broken.length) {
+        root.append(el("div", { class: "card warn-card", id: "unmatched-calls" }, el("h2", { text: `Calls to routes that don't exist here (${broken.length})` }),
+          el("ul", {}, ...broken.map((c) => el("li", {}, el("code", { text: `${c.method} ${c.path}` }), ` from ${c.evidence}`)))));
+      }
       for (const limit of section.limits || []) root.append(el("p", { class: "muted", text: limit }));
-      pick();
+      showFlow(flows.find((f) => f.id === first));
+      list.select(first);
     });
   };
 })();

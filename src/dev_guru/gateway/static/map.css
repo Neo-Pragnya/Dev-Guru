@@ -33,7 +33,6 @@
 .alone { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .warn-card { border-color: var(--warn); }
 .zoom button { padding: 4px 12px; }
-#flow-search { font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); }
 #flow-picker { max-width: 100%; }
 .neighbour { opacity: .62; }
 .neighbour rect { stroke-dasharray: 4 3; }

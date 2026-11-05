@@ -52,7 +52,7 @@ into it.
 
 ## Find your way around
 
-- **Top bar:** six views (keys `1`–`6`), search (`/`), the command palette (`Ctrl`/`⌘` `K`), the theme toggle
+- **Top bar:** 25 views (keys `1`–`6` for the first six), search (`/`), the command palette (`Ctrl`/`⌘` `K`), the theme toggle
   (`T`), and *About*, with the limitations and the manifest.
 - **Left:** "start here" cards (tour, most depended-on file, import cycles, largest file) and the package tree.
 - **Centre:** the current view. Scroll to zoom, drag to pan, `F` to fit.
