@@ -29,6 +29,9 @@ function buildWorkspace(root) {
   if (!args.includes("--repo")) for (const f of ["backend/requirements.txt", "frontend/package.json"]) renameSync(join(root, `${f}.pins`), join(root, f));
   const git = (...a) => execFileSync("git", ["-C", root, ...a], { stdio: "ignore" });
   if (!args.includes("--repo")) {
+    // reports a scanner and a test run left behind
+    writeFileSync(join(root, "scan.sarif"), JSON.stringify({ runs: [{ tool: { driver: { name: "CodeQL", rules: [{ id: "py/sql-injection", properties: { "security-severity": "9.8" }, help: { text: "Use a parameter." } }, { id: "py/unused", defaultConfiguration: { level: "note" } }] } }, results: [{ ruleId: "py/unused", message: { text: "Unused import" }, locations: [{ physicalLocation: { artifactLocation: { uri: "backend/app/main.py" }, region: { startLine: 1 } } }] }, { ruleId: "py/sql-injection", message: { text: "A query built from user input" }, locations: [{ physicalLocation: { artifactLocation: { uri: "backend/app/services/orders.py" }, region: { startLine: 6 } } }] }] }] }));
+    writeFileSync(join(root, "junit.xml"), '<testsuite><testcase classname="tests.orders" name="test_create"/><testcase classname="tests.orders" name="test_refund"><failure message="refund was 0"/></testcase></testsuite>');
     // a capability Ananke really knows, so a workflow can compile
     const skill = join(root, "skills", "demo-step");
     mkdirSync(skill, { recursive: true });
@@ -389,6 +392,23 @@ await journey("a deck comes from a Markdown file, and a path out of the workspac
 await journey("learning review says when there's nothing to review", async () => {
   await route("#/learning");
   await until(`!!document.querySelector("#learning-none") || !!document.querySelector("#learning-list")`, "the list");
+});
+if (expectGolden) await journey("findings come from the repository's own reports, worst first, with what to fix first", async () => {
+  await route("#/findings");
+  await until(`!!document.querySelector("#findings-list")`, "the findings");
+  const r = await evaluate(`({ first: document.querySelector("#findings-list tbody tr td")?.textContent, list: document.querySelector("#findings-first")?.textContent || "", tests: document.querySelector("#findings-tests")?.textContent || "", failing: document.querySelector("#findings-failures")?.textContent || "" })`);
+  expect(r.first === "critical", `the worst isn't first: ${r.first}`);
+  expect(r.list.includes("Use a parameter") && r.list.includes("test_refund"), `what to fix: ${r.list.slice(0, 200)}`);
+  expect(r.failing.includes("test_refund"), r.failing);
+  await shot("findings");
+});
+await journey("what's certain lists each view's state, and every limit", async () => {
+  await route("#/certainty");
+  await until(`!!document.querySelector("#certainty-sections")`, "the page");
+  const t = await text("#certainty-sections");
+  expect(/Unknown: not checked/.test(t), `a CVE check that hasn't run isn't called unknown: ${t.slice(0, 200)}`);
+  expect((await text("#certainty-limits")).length > 40, "no limits are listed");
+  await shot("certainty");
 });
 await journey("saving tokens shows a small map and the tools", async () => {
   await route("#/context");

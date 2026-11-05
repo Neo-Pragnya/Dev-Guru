@@ -10,6 +10,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
 
 ---
 
+## [0.9.0] — 2026-11-05
+
+### Added
+
+- **Findings.** What scanners and test runs already reported, from SARIF and JUnit reports in the repository, worst first, with a short list of what to fix first, including packages with a known fix. With no report, it says that's unknown.
+- **What's certain.** How far to trust each view: what was found, what's unknown or failed, what's always inferred, and every limit the analysis noted, in one place.
+
+### Changed
+
+- Needs Ananke 0.3.27 or later.
+
+---
+
 ## [0.8.0] — 2026-11-05
 
 ### Added
