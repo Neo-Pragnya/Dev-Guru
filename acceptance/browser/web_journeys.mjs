@@ -180,8 +180,8 @@ await journey("the interface works from the keyboard alone", async () => {
 });
 await journey("pages that don't exist yet say so and name what works today", async () => {
   const under = await evaluate(`(() => { const out = []; let later = false; for (const n of document.querySelector("nav").children) { if (n.classList.contains("nav-title")) later = n.textContent === "Not in this version"; else if (later) out.push(n.dataset.route); } return out; })()`);
-  expect(under.join() === "workflows,quality,docs,learning", `listed as not in this version: ${under}`);
-  for (const [hash, command] of [["#/workflows", "ananke app workflow-preview"], ["#/quality", "dev explore"], ["#/docs", "dev present"], ["#/learning", "dev learning review"]]) {
+  expect(under.join() === "workflows,docs,learning", `listed as not in this version: ${under}`);
+  for (const [hash, command] of [["#/workflows", "ananke app workflow-preview"], ["#/docs", "dev present"], ["#/learning", "dev learning review"]]) {
     await route(hash);
     const t = await text("#main");
     expect(/isn't in this version|aren't in this version/.test(t), `${hash} says: ${t.slice(0, 80)}`);

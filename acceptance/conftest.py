@@ -13,7 +13,10 @@ from harness import *  # noqa: E402,F403  (steps, sandbox fixture and the releas
 from harness import REPO, Sandbox  # noqa: E402
 from pytest_bdd import then  # noqa: E402
 
-collect_ignore = ["fixtures", "site"]  # fixture projects may carry their own tests; they are data here
+collect_ignore = [
+    "fixtures",
+    "site",
+]  # fixture projects may carry their own tests; they are data here
 
 VERSION_FILE = "src/dev_guru/version.py"
 

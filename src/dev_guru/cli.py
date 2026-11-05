@@ -324,6 +324,33 @@ def serve(
 
 
 @app.command()
+def context(
+    workspace: Annotated[Path, typer.Argument(help="The repository")] = Path("."),
+    budget: Annotated[int, typer.Option("--budget", help="Most tokens the map may use")] = 1500,
+    tools: Annotated[
+        bool, typer.Option("--tools", help="Which tools are ready, not the map")
+    ] = False,
+    transport: TransportOpt = "in-process",
+    as_json: JsonOpt = False,
+) -> None:
+    """A small map of a repository for an AI assistant, and which tool to use next."""
+    try:
+        client = connect(transport)
+        result = (
+            client.context_status(workspace)
+            if tools
+            else client.context_map(workspace, budget=budget)
+        )
+    except errors.GuruError as exc:
+        _fail(exc, as_json, 1)
+        return
+    if as_json or tools:
+        typer.echo(json.dumps(result, indent=1))
+    else:
+        typer.echo(result["map"])
+
+
+@app.command()
 def diagram(
     document: Annotated[Path, typer.Argument(help="An approved Markdown document")],
     output: Annotated[

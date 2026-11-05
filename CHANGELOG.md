@@ -10,6 +10,26 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
 
 ---
 
+## [0.5.0] — 2026-11-04
+
+### Added
+
+- **See how a repository works, in `dev serve`.** Ananke does the analysis, and these pages show it. Guide: [Repository views](docs/guides/repository-views.md).
+  - **Code map:** folders, files and functions, connected across folders by imports, calls, HTTP calls and table use. Open a folder to go deeper, and select something to see what uses it, with its source.
+  - **End-to-end flows:** from a frontend call, through a route and its handler, to the tables, one step at a time.
+  - **Data:** an ERD of tables, fields and keys, which code reads and writes each table, and a Mermaid copy.
+  - **API pathways:** every route and what calls it, and calls to routes that don't exist.
+  - **Architecture:** a CALM model inferred from the repository, marked as inferred, that you can download.
+  - **Quality, Coverage and CVEs:** measured values. Without a coverage report or a CVE check, they say so rather than show 0 or clean. Checking for CVEs uses the network only when you ask.
+  - **Saving tokens:** a small map of the repository for an AI assistant, and which tool answers which question.
+- **`dev context`:** the same map from the command line, usually under 2,000 tokens, current with every edit.
+
+### Changed
+
+- Needs Ananke 0.3.22 or later.
+
+---
+
 ## [0.4.0] — 2026-11-03
 
 ### Added

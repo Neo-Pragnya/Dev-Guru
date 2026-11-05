@@ -1,0 +1,39 @@
+/* Code map and end-to-end flows. */
+.map-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 340px); gap: 14px; align-items: start; margin-top: 12px; }
+/* a drawing needs the width more than the details do, until the screen has room for both */
+@media (max-width: 1700px) { .map-layout { grid-template-columns: minmax(0, 1fr); } }
+.canvas-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); max-height: 70vh; }
+.graph { display: block; }
+.node rect { fill: var(--surface-2); stroke: var(--line); stroke-width: 1.2; }
+.node { cursor: pointer; }
+.node:hover rect, .node:focus rect, .node.selected rect { stroke: var(--link); stroke-width: 2; }
+.node:focus { outline: none; }
+.node-label { fill: var(--ink); font: 600 13px var(--body); }
+.node-sub { fill: var(--muted); font: 11px var(--mono); }
+.node-table rect { fill: var(--warn-soft); }
+.node-route rect, .node-handler rect { fill: var(--ok-soft); }
+.node-client rect { fill: var(--bad-soft); }
+.edge { fill: none; stroke: var(--muted); stroke-width: 1.4; opacity: .75; }
+.edge.inferred { stroke-dasharray: 5 4; }
+.edge-calls, .edge-handles { stroke: var(--link); }
+.edge-reads { stroke: var(--ok); }
+.edge-writes { stroke: var(--bad); }
+.edge-http { stroke: var(--warn); stroke-width: 2; }
+.arrow-head { fill: var(--muted); }
+.dim { opacity: .42; }
+.chip { background: transparent; color: var(--ink); border: 1px solid var(--line); border-radius: 99px; padding: 3px 12px; font-weight: 500; }
+.chip[aria-pressed="false"] { opacity: .45; text-decoration: line-through; }
+.chip[aria-pressed="true"] { background: var(--surface-2); }
+.inspector { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; overflow-wrap: anywhere; }
+.inspector h2 { margin-top: 0; font-size: 18px; }
+.inspector h3 { font-size: 14px; margin: 12px 0 4px; }
+.source { overflow: auto; max-height: 320px; font-size: 12px; background: var(--surface-2); padding: 8px; border-radius: 8px; }
+.steps button { text-align: left; }
+.steps li[aria-current="step"] button { border-color: var(--link); background: var(--surface-2); }
+.alone { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.warn-card { border-color: var(--warn); }
+.zoom button { padding: 4px 12px; }
+#flow-search { font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); }
+#flow-picker { max-width: 100%; }
+.neighbour { opacity: .62; }
+.neighbour rect { stroke-dasharray: 4 3; }

@@ -97,6 +97,7 @@ def build(graph: GraphData, workspace: Path, *, project_name: str | None = None)
     symbols_raw = symbols_raw[:MAX_SYMBOLS]
     known_symbols = {s.id for s in symbols_raw}
 
+    file_ids = {f.id for f in files_raw}
     module_to_file: dict[str, str] = {}
     for f in files_raw:
         module = str(
@@ -116,7 +117,9 @@ def build(graph: GraphData, workspace: Path, *, project_name: str | None = None)
             owner[e.target] = e.source
         elif e.kind == "imports" and e.source.startswith("file:"):
             module = e.target.removeprefix("module:")
-            target = module_to_file.get(module)
+            # Ananke resolves imports across folders; the module-name lookup covers only what it left unresolved
+            resolved = str(getattr(e, "resolved_target", "") or "")
+            target = resolved if resolved in file_ids else module_to_file.get(module)
             if target is None:  # `from pkg import mod` resolves to pkg.mod when that file exists
                 parts = module.split(".")
                 for cut in range(len(parts), 0, -1):

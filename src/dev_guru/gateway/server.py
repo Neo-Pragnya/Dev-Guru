@@ -41,6 +41,10 @@ _STATIC = {
     "/": ("index.html", "text/html; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
     "/app.css": ("app.css", "text/css; charset=utf-8"),
+    "/map.js": ("map.js", "text/javascript; charset=utf-8"),
+    "/map.css": ("map.css", "text/css; charset=utf-8"),
+    "/insights.css": ("insights.css", "text/css; charset=utf-8"),
+    "/insights.js": ("insights.js", "text/javascript; charset=utf-8"),
     "/favicon.svg": ("favicon.svg", "image/svg+xml"),
 }
 _RUN_ID = r"run-[0-9a-f]+"
@@ -331,6 +335,25 @@ class _Handler(BaseHTTPRequestHandler):
                     depth=self._int(query, "depth", 1),
                 )
             )
+        elif path == "/api/v1/source":
+            # Ananke keeps this inside the workspace, and refuses harness state, Git data and environment files
+            self._json(
+                client.read_source(
+                    root,
+                    query.get("path", ""),
+                    self._int(query, "start", 1),
+                    self._int(query, "end", 1) if "end" in query else None,
+                )
+            )
+        elif path == "/api/v1/context":
+            self._json(
+                {
+                    **client.context_map(root, budget=self._int(query, "budget", 1500)),
+                    **client.context_status(root),
+                }
+            )
+        elif path == "/api/v1/intel":
+            self._json(self._latest_intel(root))
         elif path == "/api/v1/runs":
             self._json(client.run_history(root))
         elif match := re.fullmatch(rf"/api/v1/runs/({_RUN_ID})", path):
@@ -376,6 +399,19 @@ class _Handler(BaseHTTPRequestHandler):
             self._json(client.cancel_run(root, match[1]))
         else:
             raise _Reject(404, "NOT_FOUND", "no such route")
+
+    def _latest_intel(self, root: Path) -> dict[str, Any]:
+        """The newest finished repository analysis. Ananke computes it; a browser starts one as a repo.analyze run."""
+        client = self.gateway.client
+        for run in client.run_history(root).get("runs", []):
+            if run.get("kind") == "repo.analyze" and run.get("state") == "succeeded":
+                report: dict[str, Any] = json.loads(
+                    client.read_artifact(root, run["run_id"], "repo-intel.json")
+                )
+                report["run_id"] = run["run_id"]
+                report["analysed_at"] = run.get("created_at")
+                return report
+        raise _Reject(404, "INTEL_MISSING", "this repository hasn't been analysed yet")
 
     @staticmethod
     def _object(

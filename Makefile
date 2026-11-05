@@ -53,6 +53,7 @@ ACCEPTANCE_ARGS ?=
 # The web interface in real Chrome on its own temporary workspace (also a scenario in the suite). Needs Node 22+ and Chrome.
 web-journeys:
 	PATH="$(CURDIR)/.venv/bin:$$PATH" node acceptance/browser/web_journeys.mjs
+	PATH="$(CURDIR)/.venv/bin:$$PATH" node acceptance/browser/insight_journeys.mjs
 
 acceptance:
 	$(UV) run --frozen pytest acceptance -n auto -p no:cacheprovider $(ACCEPTANCE_ARGS)

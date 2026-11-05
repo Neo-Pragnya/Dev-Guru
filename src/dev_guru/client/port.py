@@ -53,6 +53,7 @@ class GraphEdgeData(BaseModel):
     origin: str = "extracted"
     confidence: float = 1.0
     location: str = ""
+    resolved_target: str = ""
 
 
 class GraphData(BaseModel):
@@ -126,6 +127,16 @@ class AnankeClient(Protocol):
     def learning_candidate(self, workspace: Path, name: str) -> LearningCandidate: ...
 
     def harness_capabilities(self, workspace: Path) -> dict[str, Any]: ...
+
+    def context_map(
+        self, workspace: Path, budget: int = 1500, refresh: bool = False
+    ) -> dict[str, Any]: ...
+
+    def context_status(self, workspace: Path) -> dict[str, Any]: ...
+
+    def read_source(
+        self, workspace: Path, path: str, start: int = 1, end: int | None = None
+    ) -> dict[str, Any]: ...
 
     def code_view(self, workspace: Path, **filters: Any) -> dict[str, Any]: ...
 
