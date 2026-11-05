@@ -166,7 +166,7 @@ export const STATS: { label: string; value: string; tint: string }[] = [
   },
   {
     "label": "Unit tests",
-    "value": "145",
+    "value": "143",
     "tint": "teal"
   },
   {
