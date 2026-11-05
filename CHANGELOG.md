@@ -10,6 +10,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
 
 ---
 
+## [0.5.1] — 2026-11-05
+
+### Added
+
+- The Architecture page lists what differs from a declared model as a table, rather than raw JSON.
+- A guide to [mapping a new repository](docs/guides/repository-views.md#mapping-a-new-repository).
+
+### Changed
+
+- The Saving tokens page shows `ananke context enable --local`, which keeps it out of commits.
+- Updated GitHub Actions for checkout, artifacts, Pages and build attestations.
+
+### Security
+
+- The test fixture no longer keeps its deliberately old package pins as real manifest files. They're restored only while a journey runs.
+
+---
+
 ## [0.5.0] — 2026-11-04
 
 ### Added

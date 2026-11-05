@@ -8,6 +8,7 @@ released.
 
 | Version | Highlights |
 | --- | --- |
+| **0.5.1** | The Architecture page lists differences from a declared model. A guide to mapping a new repository |
 | **0.5.0** | How a repository works, in `dev serve`: a code map across folders, end-to-end flows, an ERD, API pathways, a CALM architecture, quality, coverage, CVEs and saving tokens. `dev context` for AI assistants |
 | **0.4.0** | A web interface in `dev serve`: overview, live runs with cancel, a code view, and capabilities from your sources. No Node needed |
 | **0.3.0** | `dev serve`, a local gateway to Ananke that only your browser session can reach |

@@ -372,8 +372,8 @@
         el("div", { class: "row" }, el("button", { type: "button", class: "ghost", id: "copy-map", text: "Copy the map", on: { click: async (e) => { await navigator.clipboard.writeText(context.map); e.target.textContent = "Copied"; } } })),
         el("pre", { class: "source", id: "context-map" }, el("code", { text: context.map })),
         el("h2", { text: "Which tool for which question" }), table("routes-table", ["Question", "Use", "Why"], context.routes.map((r) => [r.question, r.use, r.why])),
-        el("h2", { text: "Using it by default" }), el("p", { class: "muted", text: "This adds a short note where your assistant reads project instructions, for Claude Code, Codex, Copilot, Kiro, Cursor and Amazon Q. ananke context disable removes it." }),
-        el("pre", { class: "source" }, el("code", { text: "ananke context enable --dry-run\nananke context enable" })),
+        el("h2", { text: "Using it by default" }), el("p", { class: "muted", text: "This adds a note of about 80 tokens where your assistant reads project instructions, for Claude Code, Codex, Copilot, Kiro, Cursor and Amazon Q. --local keeps it out of commits. ananke context disable removes it." }),
+        el("pre", { class: "source" }, el("code", { text: "ananke context enable --local --dry-run\nananke context enable --local" })),
         el("h2", { text: "Tools" }), table("context-tools", ["Tool", "Ready", "For", "Licence", "Set up"], Object.entries(context.tools).map(([name, tool]) => [name, tool.ready ? "yes" : "no", tool.for, tool.licence, typeof tool.setup === "string" ? tool.setup : (tool.setup ? tool.setup.add_to_claude_code : "")])));
     } catch (error) {
       showError(root, error);

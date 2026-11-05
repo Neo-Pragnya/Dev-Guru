@@ -5,7 +5,7 @@
 // few enough files that all of them fit the Code page's node budget, enough symbols that a graph build takes seconds.
 // Prints one line per journey and exits 1 on any failure.
 import { execFileSync, spawn } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, renameSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -25,6 +25,8 @@ function buildWorkspace(root) {
     mkdirSync(join(root, ".ananke", "architecture"), { recursive: true });
     writeFileSync(join(root, ".ananke", "architecture", "system.calm.json"), JSON.stringify({ components: [{ id: "backend", name: "backend" }, { id: "payments", name: "payments" }], relationships: [] }));
   }
+  // old pins on purpose, for known CVE answers, kept out of the repository as manifests so no scanner mistakes them for ours
+  if (!args.includes("--repo")) for (const f of ["backend/requirements.txt", "frontend/package.json"]) renameSync(join(root, `${f}.pins`), join(root, f));
   const git = (...a) => execFileSync("git", ["-C", root, ...a], { stdio: "ignore" });
   git("init", "-q"); git("add", "-A"); git("-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-qm", "init");
 }
