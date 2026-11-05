@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -23,12 +25,30 @@ class ExploreResult:
     run_id: str = ""  # the Ananke run that produced the graph, when the transport has runs
 
 
+def _analyse_repository(
+    client: AnankeClient, root: Path, check_vulnerabilities: bool
+) -> tuple[dict[str, Any] | None, str | None, str | None]:
+    """The whole-repository analysis for the report. It reads files and runs nothing. Only a CVE check, asked for
+    by name, uses the network."""
+    params = {"check_vulnerabilities": True} if check_vulnerabilities else {}
+    try:
+        run = client.submit_run(root, "repo.analyze", params, uuid.uuid4().hex)
+        client.drive_run(root, run["run_id"])
+        report = json.loads(client.read_artifact(root, run["run_id"], "repo-intel.json"))
+    except (errors.GuruError, OSError, ValueError, KeyError) as exc:
+        return None, None, f"The repository analysis isn't included: {exc}"
+    report["run_id"] = run["run_id"]
+    report["analysed_at"] = client.get_run(root, run["run_id"]).get("created_at")
+    return report, run["run_id"], None
+
+
 def explore(
     workspace: Path,
     *,
     client: AnankeClient | None = None,
     name: str | None = None,
     profile: str = "private",
+    check_vulnerabilities: bool = False,
 ) -> ExploreResult:
     client = client or connect()
     root = workspace.expanduser().resolve()
@@ -37,9 +57,29 @@ def explore(
     if not model["files"]:
         raise errors.GuruError(
             errors.WORKSPACE_INVALID,
-            f"Ananke found no Python files in {root}",
-            hint="point dev explore at a project directory that contains .py files",
+            f"Ananke found no source files in {root}",
+            hint="point dev explore at a folder with Python, JavaScript or TypeScript files, or notebooks",
         )
+    report, _run_id, problem = _analyse_repository(client, root, check_vulnerabilities)
+    if report is not None:
+        try:
+            from dev_guru.reports import repository, snapshot
+            from dev_guru.version import __version__
+
+            model["repository"] = repository.build(report)
+            written = [
+                str(n.path)
+                for n in graph.nodes
+                if n.kind == "file" and n.path and not str(n.path).endswith(".ipynb")
+            ]
+            model["serve"] = snapshot.build(
+                client, root, report, sorted(set(written)), name or root.name, __version__
+            )
+        except (errors.GuruError, OSError, ValueError, KeyError) as exc:
+            model.pop("serve", None)
+            problem = f"The repository analysis isn't included: {exc}"
+    if problem:
+        model["limitations"] = [*model.get("limitations", []), problem]
     report_manifest = render.manifest(
         model, workspace=root, ananke_version=graph.ananke_version, snapshot_id=graph.snapshot_id
     )

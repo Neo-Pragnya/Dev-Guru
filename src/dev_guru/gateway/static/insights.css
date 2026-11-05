@@ -25,3 +25,12 @@
 .sev-critical, .sev-high { background: var(--bad-soft); color: var(--bad); }
 .sev-moderate, .sev-medium { background: var(--warn-soft); color: var(--warn); }
 .sev-low { background: var(--ok-soft); color: var(--ok); }
+.notebook-outline { list-style: none; padding: 0; }
+.notebook-outline li { margin: 6px 0; }
+.notebook-outline p { margin: 2px 0 8px; }
+.notebook-outline .level-2 { padding-left: 16px; }
+.notebook-outline .level-3 { padding-left: 32px; }
+.notebook-outline .level-4, .notebook-outline .level-5, .notebook-outline .level-6 { padding-left: 48px; font-size: 14px; }
+#notebook-list button[aria-current="step"] { border-color: var(--link); }
+button.link { padding: 0; border: 0; background: none; color: var(--link); text-decoration: underline; text-align: left; overflow-wrap: anywhere; }
+

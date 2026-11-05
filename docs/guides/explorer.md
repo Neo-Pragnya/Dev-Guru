@@ -63,6 +63,18 @@ A narrated walk: the overview, the biggest packages, entry points, the most depe
 cycles, external dependencies, and finally what the map can't see. Use the arrow keys or the buttons; it pauses
 when you ask it to.
 
+## Every page of `dev serve`, in the file
+
+The tabs after Tour are the pages of [`dev serve`](repository-views.md): Overview, Code map, End-to-end flows, Notebooks, Data, API pathways, Architecture, Quality, Coverage, CVEs, Saving tokens, Code, Runs and Capabilities. They're the same pages, with a recording of what they ask for, so you can step through a flow or read a table's fields with nothing running.
+
+A file can't start anything, so its buttons for analysing, checking for vulnerabilities and starting a run say to use `dev serve`. It makes no network requests, so CVEs say they weren't checked unless you ask when you make it:
+
+```bash
+dev explore . -o report.html --check-vulnerabilities
+```
+
+That looks up dependencies at osv.dev, sending package names and versions, and nothing else. With `--profile public`, these pages are left out, and a Repository tab keeps only counts. On a very large repository, the views of single files stop at a limit, and a page says if it can't show you one.
+
 ## The inspector
 
 Pick anything to see its path, docstring, signature, source with line numbers, and every connection, each one

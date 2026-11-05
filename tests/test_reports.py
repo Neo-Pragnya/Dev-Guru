@@ -115,7 +115,7 @@ def test_html_is_offline_and_traceable(tmp_path: Path) -> None:
     page = render.render(m, man)
     assert not re.search(r"""(src|href)\s*=\s*["']?(https?:)?//""", page), "no external resources"
     assert "connect-src 'none'" in page  # the page itself forbids network access
-    assert page.count("</script>") == 3  # only the page's own three script blocks
+    assert page.count("</script>") == 5  # only the page's own script and data blocks
     assert man["input_digest"] == render.digest(m) and man["renderer"] == render.RENDERER
 
 

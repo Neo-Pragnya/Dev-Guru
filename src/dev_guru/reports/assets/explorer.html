@@ -42,6 +42,7 @@
         <svg id="svg" class="canvas" role="img" aria-labelledby="viewTitle"></svg>
         <canvas id="space" class="canvas" role="img" aria-label="Files as a 3D force-directed graph. Use the sidebar or search to reach any file by keyboard." hidden></canvas>
         <div id="treemap" class="treemap" hidden></div>
+        <div id="repoView" class="repo-view" hidden></div>
         <div class="zoom" id="zoomTools">
           <button class="btn icon" id="zoomIn" aria-label="Zoom in">+</button>
           <button class="btn icon" id="zoomOut" aria-label="Zoom out">−</button>
@@ -62,6 +63,7 @@
     </main>
     <aside class="inspector" id="inspector" aria-label="Inspector" tabindex="-1"><div id="inspectBody"></div></aside>
   </div>
+  <iframe id="serveFrame" title="Repository views" hidden></iframe>
   <footer class="foot" id="foot"></footer>
 </div>
 <div class="palette" id="palette" role="dialog" aria-modal="true" aria-label="Command palette" hidden>
@@ -71,6 +73,8 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script type="application/json" id="dg-data">{{DATA}}</script>
 <script type="application/json" id="dg-manifest">{{MANIFEST}}</script>
+<script type="application/json" id="dg-serve">{{SERVE_DATA}}</script>
+<script type="application/json" id="dg-serve-shell">{{SERVE_SHELL}}</script>
 <script>{{JS}}</script>
 </body>
 </html>

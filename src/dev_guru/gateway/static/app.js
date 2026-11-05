@@ -29,6 +29,13 @@ class ApiError extends Error {
 }
 
 async function api(path, body) {
+  if (window.DEV_GURU_STATIC) {
+    try {
+      return window.DEV_GURU_STATIC(path, body);
+    } catch (error) {
+      throw new ApiError(error.status || 404, error.code || "NOT_IN_THIS_REPORT", error.message, false);
+    }
+  }
   const options = { credentials: "same-origin" };
   if (body !== undefined) {
     options.method = "POST";
@@ -105,9 +112,34 @@ async function overview() {
     main.append(el("h2", { text: "What the harness can run" }));
     main.append(el("div", { class: "row" }, ...caps.run_kinds.map((k) => el("code", { class: "pill", text: k }))));
     main.append(el("div", { class: "row" }, el("a", { href: "#/runs", text: "Go to runs" }), el("a", { href: "#/code", text: "Explore the code" })));
+    await repositorySummary(main, runs);
   } catch (error) {
     showError(main, error);
   }
+}
+
+// One line for each repository view, or an offer to analyse. Unknown stays unknown.
+async function repositorySummary(main, runs) {
+  main.append(el("h2", { text: "This repository" }));
+  if (!(runs.runs || []).some((r) => r.kind === "repo.analyze" && r.state === "succeeded")) {
+    main.append(el("p", { id: "overview-unanalysed", text: "It hasn't been analysed yet. " }, el("a", { href: "#/map", text: "Open the code map to analyse it" })));
+    return;
+  }
+  const report = await api(scoped("/api/v1/intel"));
+  const s = report.sections;
+  const line = (href, title, text) => el("tr", {}, el("td", {}, el("a", { href, text: title })), el("td", { text }));
+  const count = (list, noun) => `${(list || []).length} ${noun}${(list || []).length === 1 ? "" : "s"}`;
+  const vulns = s.dependencies.vulnerabilities;
+  main.append(el("table", { id: "overview-sections" }, el("tbody", {},
+    line("#/map", "Code map", `${s.overview.files} files, ${s.overview.loc} lines`),
+    line("#/flows", "End-to-end flows", count(s.flows.flows, "flow")),
+    line("#/data", "Data", `${count(s.data.tables, "table")}, ${count(s.data.relationships, "relationship")}`),
+    line("#/apis", "API pathways", `${count(s.api.routes, "route")}, ${count(s.api.unmatched_clients, "call")} with no route here`),
+    line("#/architecture", "Architecture", `${count(s.overview.components, "component")}, inferred`),
+    line("#/quality", "Quality", `Average complexity ${s.quality.totals?.avg_complexity ?? "unknown"}`),
+    line("#/coverage", "Coverage", typeof s.coverage.line_rate === "number" ? `${Math.round(s.coverage.line_rate * 100)}% of lines` : "Unknown: no report found"),
+    line("#/cves", "CVEs", vulns === null || vulns === undefined ? "Not checked" : count(vulns, "known vulnerability").replace("vulnerabilitys", "vulnerabilities")),
+    line("#/context", "Saving tokens", "A small map for an AI assistant"))));
 }
 
 // ------------------------------------------------------------------ runs
@@ -207,7 +239,7 @@ async function runDetail(runId, loaded) {
     const listed = await api(scoped(`/api/v1/runs/${runId}/artifacts`));
     files.replaceChildren(listed.artifacts.length
       ? el("ul", {}, ...listed.artifacts.map((a) => el("li", {},
-        el("a", { href: scoped(`/api/v1/runs/${runId}/artifacts/${encodeURIComponent(a.name)}`), download: a.name, text: a.name }),
+        window.DEV_GURU_STATIC ? el("span", { text: a.name }) : el("a", { href: scoped(`/api/v1/runs/${runId}/artifacts/${encodeURIComponent(a.name)}`), download: a.name, text: a.name }),
         el("span", { class: "muted", text: ` ${a.size} bytes · ${a.producer}` }))))
       : el("p", { class: "muted", text: ACTIVE.has(run.state) ? "None yet." : "This run produced none." }));
     return run;
@@ -407,6 +439,7 @@ async function init() {
   let saved = null;
   try { saved = localStorage.getItem("dev-guru-theme"); } catch { /* not available here */ }
   setTheme(saved || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
+  if (window.DEV_GURU_STATIC) document.documentElement.classList.add("in-report");
   document.querySelector("#theme").addEventListener("click", () => setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark"));
   // The address holds the page, so the skip link moves focus instead of changing it.
   document.querySelector(".skip").addEventListener("click", (event) => { event.preventDefault(); document.querySelector("#main").focus(); });

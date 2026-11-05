@@ -363,6 +363,98 @@
   });
 
   // ------------------------------------------------------------------ saving tokens
+  // ---------------------------------------------------------------- notebooks
+  views.notebooks = async () => {
+    page("Notebooks", "What each notebook does, in its own words, and how they feed each other. No cell was run.");
+    const root = main();
+    await withAnalysis(root, (report) => {
+      const data = report.sections.notebooks;
+      if (!status(data, "No notebooks here.")) return;
+      const all = data.notebooks || [];
+      const originals = all.filter((n) => !n.same_as);
+      const copies = all.length - originals.length;
+      root.append(el("div", { class: "cards" }, stat(originals.length, "Notebooks"), stat(data.written_total, "Files they write"), stat((data.links || []).length, "Links between them"),
+        stat(originals.reduce((sum, n) => sum + n.cells.code, 0), "Code cells")));
+      if (copies) root.append(el("p", { class: "muted", id: "notebook-copies", text: `${copies} ${copies === 1 ? "copy" : "copies"} of these, such as an executed version, aren't counted again.` }));
+      const detail = el("div", { id: "notebook-detail" });
+      const paths = originals.map((n) => n.path);
+      const byPath = new Map(originals.map((n) => [n.path, n]));
+      let current = 0;
+      const short = (path) => path.split("/").pop().replace(/\.ipynb$/, "");
+      const rows = (id, title, heads, body) => (body.length ? [el("h3", { text: title }), table(id, heads, body)] : []);
+      const words = (list, none) => (list.length ? list.join(", ") : none);
+      const show = (index) => {
+        current = Math.max(0, Math.min(paths.length - 1, index));
+        const n = byPath.get(paths[current]);
+        for (const row of nav.querySelectorAll("button")) {
+          if (row.dataset.path === n.path) row.setAttribute("aria-current", "step"); else row.removeAttribute("aria-current");
+        }
+        const from = (data.links || []).filter((l) => l.to === n.path);
+        const to = (data.links || []).filter((l) => l.from === n.path);
+        const facts = [`${n.cells.code} code cells and ${n.cells.markdown} text cells.`];
+        if (n.written.length) facts.push(`It writes ${n.written.length} ${n.written.length === 1 ? "file" : "files"}.`);
+        if (n.defines.length) facts.push(`It defines ${n.defines.length} functions and classes of its own.`);
+        if (from.length) facts.push(`It builds on ${new Set(from.map((l) => l.from)).size} other notebooks.`);
+        if (to.length) facts.push(`${new Set(to.map((l) => l.to)).size} other notebooks build on it.`);
+        const outline = el("ol", { class: "notebook-outline", id: "notebook-outline" }, ...n.outline.map((o) => el("li", { class: `level-${o.level}` },
+          el("strong", { text: o.title }), el("span", { class: "muted mono", text: ` cell ${o.cell}` }), o.summary ? el("p", { text: o.summary }) : null)));
+        const source = el("div", { id: "notebook-source" });
+        const written = n.written.map((w) => [
+          el("button", { type: "button", class: "ghost link", text: w.path, on: { click: () => showWritten(source, w.path) } }),
+          `cell ${w.cell}`, w.lines, w.symbols.join(", ") || "",
+        ]);
+        graph.highlight(new Set([n.path, ...from.map((l) => l.from), ...to.map((l) => l.to)]));
+        detail.replaceChildren(el("h2", { id: "notebook-title", text: n.title }), el("p", { class: "muted mono", text: n.path }),
+          ...(n.purpose ? [el("p", { id: "notebook-purpose", text: n.purpose })] : []),
+          el("p", { id: "notebook-facts", text: facts.join(" ") }),
+          ...(n.outline.length ? [el("h3", { text: n.outline_total > n.outline.length ? `What it covers (first ${n.outline.length} of ${n.outline_total})` : "What it covers" }), outline] : []),
+          ...rows("notebook-written", "Files it writes", ["File", "Where", "Lines", "Defines"], written), source,
+          ...rows("notebook-from", "Builds on", ["Notebook", "Through", "How"], from.map((l) => [short(l.from), l.via, l.kind])),
+          ...rows("notebook-to", "Used by", ["Notebook", "Through", "How"], to.map((l) => [short(l.to), l.via, l.kind])),
+          el("h3", { text: "What it uses" }), el("p", {}, el("strong", { text: "Packages: " }), words(n.imports, "none found")),
+          el("p", {}, el("strong", { text: "Data it reads: " }), words(n.reads, "none named in its code")),
+          el("p", {}, el("strong", { text: "Data it writes: " }), words(n.writes, "none named in its code")),
+          ...(n.defines.length ? [el("p", {}, el("strong", { text: "Defines: " }), n.defines.join(", "))] : []));
+      };
+      const showWritten = async (box, path) => {
+        box.replaceChildren(el("p", { class: "muted", text: `Loading ${path}...` }));
+        try {
+          const found = await window.DevGuru.api(window.DevGuru.scoped("/api/v1/source", { path }));
+          box.replaceChildren(el("h3", { text: path }), el("pre", { class: "source" }, el("code", { text: found.lines.join("\n") })));
+        } catch (error) {
+          box.replaceChildren(el("p", { class: "muted", text: `Source isn't available: ${error.message}` }));
+        }
+      };
+      const pairs = new Map();
+      for (const link of data.links || []) {
+        if (!byPath.has(link.from) || !byPath.has(link.to)) continue;
+        const key = `${link.from}\0${link.to}`;
+        const pair = pairs.get(key) || { source: link.from, target: link.to, kind: "calls", kindLabel: "builds on", kinds: ["calls"], count: 0 };
+        pair.count += 1;
+        pairs.set(key, pair);
+      }
+      const graph = window.DevGuru.drawGraph({
+        nodes: originals.map((n) => ({ id: n.path, kind: "file", label: short(n.path), sub: n.folder })),
+        edges: [...pairs.values()],
+        label: "How the notebooks feed each other",
+        onSelect: (node) => show(paths.indexOf(node.id)),
+      });
+      const nav = el("div", { id: "notebook-list" }, ...(data.groups || []).flatMap((group) => {
+        const mine = group.notebooks.filter((p) => byPath.has(p));
+        return mine.length ? [el("h3", { text: group.folder }), el("div", { class: "row" }, ...mine.map((p) =>
+          el("button", { type: "button", class: "ghost", "data-path": p, text: byPath.get(p).title, on: { click: () => show(paths.indexOf(p)) } })))] : [];
+      }));
+      root.append(window.DevGuru.panZoom(graph.canvas), el("div", { class: "canvas-wrap", id: "notebook-graph" }, graph.canvas),
+        el("div", { class: "row" },
+          el("button", { type: "button", class: "ghost", id: "notebook-previous", text: "Previous notebook", on: { click: () => show(current - 1) } }),
+          el("button", { type: "button", class: "ghost", id: "notebook-next", text: "Next notebook", on: { click: () => show(current + 1) } })),
+        nav, detail);
+      const more = limits(data);
+      if (more) root.append(more);
+      if (paths.length) show(0);
+    });
+  };
+
   views.context = async () => {
     page("Saving tokens", "A small map of this repository for an AI assistant, and which tool to use next.");
     const root = main();

@@ -10,6 +10,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
 
 ---
 
+## [0.6.0] — 2026-11-05
+
+### Added
+
+- **Every page of `dev serve`, in the one offline `dev explore` file.** Overview, Code map, End-to-end flows, Data, API pathways, Architecture, Quality, Coverage, CVEs, Saving tokens, Code, Runs and Capabilities sit beside the explorer's tabs. They're the same pages, with a recording behind them, and the file still fetches nothing. The public profile leaves them out, and keeps counts in a Repository tab.
+- **Folders of notebooks.** Code in `%%writefile` cells counts on every page, even if nobody has run the notebook. A new **Notebooks** page explains each one from its own headings and code: what it's for, what it covers, what it writes, what it builds on, and how they feed each other. Guide: [Folders of notebooks](docs/guides/notebooks.md).
+- `dev explore --check-vulnerabilities`, for a file that shows real CVEs and fixes. It uses the network only when you ask.
+- **Impact and paths on the Code map.** Select anything to see how many items in the view depend on it, directly or through others, and find how it connects to something else.
+- **The `dev serve` Overview summarises each repository view,** and says what's unknown or not analysed yet.
+
+### Changed
+
+- The website's example now shows all of this, on a small shop with its notebooks. A second example shows Dev Guru itself.
+- The roadmap moved into the documentation, and the website's home page shows the version on PyPI.
+- Needs Ananke 0.3.25 or later.
+
+---
+
 ## [0.5.1] — 2026-11-05
 
 ### Added

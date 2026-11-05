@@ -2,13 +2,13 @@
 export const site = {
   "name": "Dev Guru",
   "tagline": "See your code. Understand it. Change it with confidence.",
-  "description": "Dev Guru turns any Python codebase into an interactive, offline map: architecture, dependency flow, blast radius, calls and hotspots, computed locally by Ananke Plexus.",
+  "description": "Dev Guru turns any code repository or folder of notebooks into an interactive, offline map: architecture, dependency flow, blast radius, calls and hotspots, computed locally by Ananke Plexus.",
   "repo": "https://github.com/Neo-Pragnya/Dev-Guru",
   "docsDir": "docs",
   "eyebrow": "Developer product on Ananke Plexus",
   "headline": "Light up your codebase,",
   "highlight": "one map at a time.",
-  "lede": "Point Dev Guru at a project and get one offline HTML explorer: a living constellation of packages, the flow of dependencies, the blast radius of a change, who calls what, and a guided tour, with the source one click away.",
+  "lede": "Point Dev Guru at a project or a folder of notebooks and get one offline file: a living constellation of packages, the blast radius of a change, end-to-end flows, an ERD of your tables, every API route, a CALM architecture, quality, coverage and CVEs, with the source one click away.",
   "install": "pip install dev-guru",
   "ctas": [
     {
@@ -44,10 +44,6 @@ export const NAV: { label: string; href: string }[] = [
     "href": "docs/"
   },
   {
-    "label": "Roadmap ↗",
-    "href": "https://github.com/Neo-Pragnya/Dev-Guru/blob/main/ROADMAP.md"
-  },
-  {
     "label": "Ananke Plexus ↗",
     "href": "https://neo-pragnya.github.io/Ananke-Plexus/"
   },
@@ -70,7 +66,8 @@ export const DOC_NAV: { section: string; items: string[]; shapes: string; tint: 
   {
     "section": "Overview",
     "items": [
-      "index"
+      "index",
+      "roadmap"
     ],
     "shapes": "blob>star",
     "tint": "coral"
@@ -84,7 +81,8 @@ export const DOC_NAV: { section: string; items: string[]; shapes: string; tint: 
       "guides/diagrams",
       "guides/sdk",
       "guides/gateway",
-      "guides/repository-views"
+      "guides/repository-views",
+      "guides/notebooks"
     ],
     "shapes": "hex>flower8",
     "tint": "lemon"
@@ -123,6 +121,8 @@ export const DOC_TITLES: Record<string, string> = {
   "guides/sdk": "Python SDK",
   "guides/gateway": "The local gateway",
   "guides/repository-views": "Repository views",
+  "guides/notebooks": "Folders of notebooks",
+  "roadmap": "Roadmap",
   "reference/cli": "CLI reference",
   "reference/report-format": "Report format"
 };
@@ -160,18 +160,18 @@ export const FEATURES: { title: string; text: string; href: string; shapes: stri
 
 export const STATS: { label: string; value: string; tint: string }[] = [
   {
-    "label": "Explorer views",
-    "value": "6",
+    "label": "Views in one offline file",
+    "value": "20",
     "tint": "coral"
   },
   {
     "label": "Unit tests",
-    "value": "33",
+    "value": "145",
     "tint": "teal"
   },
   {
     "label": "Browser journeys per release",
-    "value": "9",
+    "value": "48",
     "tint": "lilac"
   }
 ];

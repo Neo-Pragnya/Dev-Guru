@@ -111,3 +111,11 @@ a { text-decoration-color: color-mix(in srgb, var(--link) 40%, transparent); }
   .pipe::after { content: "↓"; right: 50%; top: auto; bottom: -11px; transform: translateX(50%); }
 }
 @media (prefers-reduced-motion: reduce) { .mini *, .embers { animation: none !important; } }
+
+/* install line + PyPI chip */
+.install-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 18px; }
+.install-row .install-line { margin-top: 0; }
+.pypi-chip { display: inline-flex; align-items: stretch; border-radius: 8px; overflow: hidden; text-decoration: none; font-weight: 600; font-size: .82rem; line-height: 1; border: 1px solid rgb(232 150 60 / 55%); }
+.pypi-chip span, .pypi-chip strong { padding: 9px 11px; }
+.pypi-chip span { background: rgb(128 128 128 / 14%); color: inherit; }
+.pypi-chip strong { background: linear-gradient(180deg, #f6b65c, #e8923c); color: #1a1208; }

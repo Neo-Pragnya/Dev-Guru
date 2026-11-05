@@ -43,8 +43,9 @@ jobs:
       - name: Generate the live demo (Dev Guru exploring its own source)
         run: |
           uv sync --frozen
-          uv run --frozen dev explore . -o website/public/demo/dev-guru-explorer.html --name "Dev Guru"
-          node acceptance/browser/report_journeys.mjs website/public/demo/dev-guru-explorer.html
+          uv run --frozen python scripts/build_demo.py website/public/demo
+          node acceptance/browser/report_journeys.mjs website/public/demo/dev-guru-explorer.html --full
+          node acceptance/browser/report_journeys.mjs website/public/demo/dev-guru-on-itself.html
 
       - name: Build site (astro check + build)
         working-directory: website
