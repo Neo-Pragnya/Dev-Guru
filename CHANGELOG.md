@@ -10,6 +10,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
 
 ---
 
+## [0.11.1] — 2026-11-05
+
+### Fixed
+
+- **Package firewalls quarantined Dev Guru through Ananke.** Ananke up to 0.3.28 shipped a vendored, minified Mermaid bundle with undeclared licences and read keychain secrets with the command infostealers use. Dev Guru's own files were clean, but installing it pulled in that Ananke. It now needs Ananke 0.3.30, which ships neither.
+
+### Added
+
+- **The release gate blocks what got us quarantined:** minified or third-party code whose licence isn't declared, malware-shaped code anywhere in the wheel or sdist, and any GuardDog rule nobody has reviewed. Grype and osv-scanner check the dependency tree alongside pip-audit when installed. Reviewed findings, each with a reason, are in `.scan-dist.toml`.
+
+---
+
 ## [0.11.0] — 2026-11-05
 
 ### Fixed
