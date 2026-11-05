@@ -45,6 +45,8 @@ _STATIC = {
     "/map.js": ("map.js", "text/javascript; charset=utf-8"),
     "/map.css": ("map.css", "text/css; charset=utf-8"),
     "/insights.css": ("insights.css", "text/css; charset=utf-8"),
+    "/lantern.css": ("lantern.css", "text/css; charset=utf-8"),
+    "/lantern.js": ("lantern.js", "text/javascript; charset=utf-8"),
     "/insights.js": ("insights.js", "text/javascript; charset=utf-8"),
     "/studio.js": ("studio.js", "text/javascript; charset=utf-8"),
     "/favicon.svg": ("favicon.svg", "image/svg+xml"),

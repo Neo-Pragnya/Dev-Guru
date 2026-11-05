@@ -10,6 +10,28 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
 
 ---
 
+## [0.10.0] — 2026-11-05
+
+### Changed
+
+- **Every page now looks and works like the explorer's first six views,** in reports and in `dev serve`: the same palette and type, a rail, a live stage, an inspector, and a walk-through. Hovering lights up what connects, with light travelling along the lines.
+- **New drawings for pages that were only tables:** an overview of every view, callers to routes to handlers, files sized and coloured for quality and coverage, vulnerable packages, findings, how far each view can be trusted, which tool answers which question, runs, capabilities, documents and learning candidates.
+- **CVEs group by package in the drawing,** with each advisory in the rail.
+- **The Workflows canvas is shown first,** starting from a two-step draft, with the form a click away.
+
+### Added
+
+- **`#play=1` for a framed report:** it shows each view in turn until someone reaches for it.
+- **A check on every page:** browser journeys now fail if a page loses its rail, stage or inspector, or stops moving, if the inspector covers the page at a tablet's width, or if a framed report's tabs squeeze its stage.
+
+### Fixed
+
+- A framed report's tabs took most of the frame and left almost no stage.
+- The website showed empty black panels for 13 of its view cards, and left out six views. All 25 now have an animated preview.
+- The example on the website now has real capabilities, Markdown files and a learning candidate to show.
+
+---
+
 ## [0.9.0] — 2026-11-05
 
 ### Added

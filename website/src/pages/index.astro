@@ -34,6 +34,12 @@ const views = [
   { id: "findings", q: "What should I fix first?", title: "Findings", text: "Scanner and test reports from the repository, worst first, with a short list of what to do." },
   { id: "certainty", q: "How far can I trust this?", title: "What's certain", text: "Each view's state, what's inferred, and everything the analysis couldn't tell." },
   { id: "tokens", q: "How do I save tokens?", title: "Saving tokens", text: "A small map of the repository for an AI assistant, and which tool answers what." },
+  { id: "code", q: "What's in this folder?", title: "Code", text: "The code graph by folder, file or symbol, with what's inside each and what links them." },
+  { id: "runs", q: "What ran?", title: "Runs", text: "Every run that made this report, with its events and what it produced." },
+  { id: "capabilities", q: "What can I reuse?", title: "Capabilities", text: "The skills and tools your sources offer, and who says what about each." },
+  { id: "workflows", q: "Can I chain these?", title: "Workflows", text: "Put capabilities in order on a canvas, then see what would run before anything does." },
+  { id: "documents", q: "Can docs become diagrams?", title: "Documentation", text: "Turn a Markdown file into swimlanes and BPMN, an offline deck, or a cited diagram." },
+  { id: "learning", q: "What did we learn?", title: "Learning review", text: "What Ananke learned, what evidence it has, and where it would go, before anything is reused." },
 ];
 ---
 
@@ -58,9 +64,9 @@ const views = [
     <div data-reveal style="--d: .12s">
       <div class="window">
         <div class="window-bar"><i></i><i></i><i></i><span>dev explore . -o explorer.html</span><a href={demo} target="_blank" rel="noopener">Open full screen ↗</a></div>
-        <iframe src={`${demo}#view=constellation&embed=1`} title="Live Dev Guru report on an example shop" loading="lazy"></iframe>
+        <iframe src={`${demo}#view=constellation&embed=1&play=1`} title="Live Dev Guru report on an example shop, showing each view in turn" loading="lazy"></iframe>
       </div>
-      <p class="window-caption">Live: Dev Guru exploring its own source. Drag, zoom, hover, press <kbd>/</kbd> to search.</p>
+      <p class="window-caption">Live, on an example shop: every view in turn. Click inside to take over.</p>
     </div>
   </section>
 
@@ -72,7 +78,7 @@ const views = [
     </div>
   )}
 
-  <h2 data-reveal>Six ways to see your code</h2>
+  <h2 data-reveal>{views.length} ways to see your code</h2>
   <p class="section-lede" data-reveal>Every report holds all of these over the same data, in one file. Each card opens that view of the live demo.</p>
   <div class="views">
     {views.map((v, i) => (
@@ -102,6 +108,85 @@ const views = [
           </g>)}
           {v.id === "hotspots" && (<g>
             {([[10,10,90,100,"#ffb347"],[104,10,70,60,"#ff6b3d"],[104,74,70,36,"#ffd27a"],[178,10,52,45,"#13a898"],[234,10,56,45,"#ffd27a"],[178,59,40,51,"#13a898"],[222,59,68,51,"#ffb347"]] as [number, number, number, number, string][]).map(([x, y, w, h, c]) => (<rect class="bar" x={x} y={y} width={w} height={h} rx="5" fill={c} />))}
+          </g>)}
+          {v.id === "overview" && (<g>
+            {[[60,28],[150,14],[240,28],[270,84],[30,84],[150,106]].map(([x, y], k) => (<g><path class="flow" d={`M150,60 L${x},${y}`} stroke={["#ffb347","#13a898","#8f73ff","#e94f7a","#13a898","#ffb347"][k]} fill="none" stroke-width="1.5" /><circle class="star" cx={x} cy={y} r="6" fill={["#ffb347","#13a898","#8f73ff","#e94f7a","#13a898","#ffb347"][k]} /></g>))}
+            <circle class="ripple" cx="150" cy="60" r="10" fill="none" stroke="#ffb347" stroke-width="2" /><circle cx="150" cy="60" r="12" fill="#ffb347" style="filter: drop-shadow(0 0 8px #ff6b3d)" />
+          </g>)}
+          {v.id === "codemap" && (<g>
+            {[[20,16,"#ffb347"],[20,76,"#8f73ff"],[115,46,"#13a898"],[210,16,"#e94f7a"],[210,76,"#ffb347"]].map(([x, y, c]) => (<rect x={x as number} y={y as number} width="70" height="28" rx="6" fill="#1c1422" stroke={c as string} />))}
+            <path class="flow" d="M90,30 C105,30 100,60 115,60" stroke="#ffb347" fill="none" stroke-width="2" /><path class="flow" d="M90,90 C105,90 100,60 115,60" stroke="#8f73ff" fill="none" stroke-width="2" /><path class="flow" d="M185,60 C200,60 195,30 210,30" stroke="#13a898" fill="none" stroke-width="2" /><path class="flow" d="M185,60 C200,60 195,90 210,90" stroke="#e94f7a" fill="none" stroke-width="2" />
+          </g>)}
+          {v.id === "e2e" && (<g>
+            {[[12,"#ffb347","GET"],[84,"#13a898","route"],[156,"#8f73ff","code"],[228,"#e94f7a","table"]].map(([x, c, s]) => (<g><rect x={x as number} y="44" width="60" height="32" rx="7" fill="#1c1422" stroke={c as string} /><text x={(x as number) + 30} y="64" text-anchor="middle" fill="#e9dfd3" font-size="11">{s}</text></g>))}
+            <path d="M72,60 H84 M144,60 H156 M216,60 H228" stroke="#6d5a49" stroke-width="2" />
+            <circle class="comet" style="offset-path: path('M12,60 H288'); filter: drop-shadow(0 0 8px #ffb347)" r="6" fill="#ffd27a" />
+          </g>)}
+          {v.id === "notebooks" && (<g>
+            {[[24,"#ffb347"],[116,"#13a898"],[208,"#8f73ff"]].map(([x, c]) => (<g><rect x={x as number} y="22" width="68" height="76" rx="7" fill="#1c1422" stroke={c as string} /><path d={`M${(x as number) + 10},40 h48 M${(x as number) + 10},54 h34 M${(x as number) + 10},68 h42 M${(x as number) + 10},82 h26`} stroke={c as string} opacity=".6" stroke-width="2" /></g>))}
+            <path class="flow" d="M92,60 C102,60 106,60 116,60" stroke="#ffb347" fill="none" stroke-width="2" /><path class="flow" d="M184,60 C194,60 198,60 208,60" stroke="#13a898" fill="none" stroke-width="2" />
+          </g>)}
+          {v.id === "data" && (<g>
+            {[[18,14,"#ffb347"],[186,14,"#13a898"],[102,70,"#8f73ff"]].map(([x, y, c]) => (<g><rect x={x as number} y={y as number} width="96" height="40" rx="6" fill="#1c1422" stroke={c as string} /><rect x={x as number} y={y as number} width="96" height="12" rx="6" fill={c as string} opacity=".55" /><path d={`M${(x as number) + 8},${(y as number) + 22} h52 M${(x as number) + 8},${(y as number) + 32} h36`} stroke="#b9a89a" stroke-width="2" /></g>))}
+            <path class="flow" d="M114,34 C150,34 150,34 186,34" stroke="#ffb347" fill="none" stroke-width="2" /><path class="flow" d="M66,54 C66,90 80,90 102,90" stroke="#8f73ff" fill="none" stroke-width="2" /><path class="flow" d="M234,54 C234,90 220,90 198,90" stroke="#13a898" fill="none" stroke-width="2" />
+          </g>)}
+          {v.id === "apis" && (<g>
+            {([["GET",16,"#13a898"],["POST",48,"#ffb347"],["DEL",80,"#e94f7a"]] as [string, number, string][]).map(([m, y, c]) => (<g><rect x="16" y={y} width="42" height="22" rx="5" fill={c} opacity=".85" /><text x="37" y={y + 15} text-anchor="middle" fill="#160f05" font-size="10" font-weight="700">{m}</text><rect x="66" y={y} width="96" height="22" rx="5" fill="#1c1422" stroke={c} /><path class="flow" d={`M162,${y + 11} C190,${y + 11} 190,60 214,60`} stroke={c} fill="none" stroke-width="1.8" /></g>))}
+            <rect x="214" y="42" width="70" height="36" rx="7" fill="#261a2e" stroke="#8f73ff" />
+          </g>)}
+          {v.id === "architecture" && (<g>
+            {[[20,40,"#ffb347"],[118,14,"#13a898"],[118,70,"#8f73ff"],[216,40,"#e94f7a"]].map(([x, y, c]) => (<rect x={x as number} y={y as number} width="66" height="38" rx="8" fill="#1c1422" stroke={c as string} stroke-dasharray="4 3" />))}
+            <path class="flow" d="M86,59 C102,59 102,33 118,33" stroke="#ffb347" fill="none" stroke-width="2" /><path class="flow" d="M86,59 C102,59 102,89 118,89" stroke="#8f73ff" fill="none" stroke-width="2" /><path class="flow" d="M184,33 C200,33 200,59 216,59" stroke="#13a898" fill="none" stroke-width="2" /><path class="flow" d="M184,89 C200,89 200,59 216,59" stroke="#e94f7a" fill="none" stroke-width="2" />
+          </g>)}
+          {v.id === "quality" && (<g>
+            {[[30,70,"#ffd27a"],[80,52,"#ffd27a"],[130,88,"#ffb347"],[180,40,"#ffb347"],[230,98,"#ff6b3d"]].map(([x, h, c]) => (<rect class="bar" x={x as number} y={112 - (h as number)} width="38" height={h as number} rx="5" fill={c as string} />))}
+          </g>)}
+          {v.id === "coverage" && (<g>
+            {([[10,10,110,100,"#13a898"],[124,10,80,58,"#13a898"],[124,72,80,38,"#ffb347"],[208,10,82,44,"#ffb347"],[208,58,40,52,"#e94f7a"],[252,58,38,52,"#13a898"]] as [number, number, number, number, string][]).map(([x, y, w, h, c]) => (<rect class="bar" x={x} y={y} width={w} height={h} rx="5" fill={c} />))}
+          </g>)}
+          {v.id === "cves" && (<g>
+            <circle cx="150" cy="60" r="44" fill="none" stroke="#34253a" stroke-dasharray="3 5" />
+            <circle class="ripple" cx="150" cy="60" r="8" fill="none" stroke="#e94f7a" stroke-width="2" /><circle class="ripple b" cx="150" cy="60" r="8" fill="none" stroke="#ff6b3d" stroke-width="2" />
+            <circle cx="150" cy="60" r="10" fill="#ffb347" /><circle class="star" cx="150" cy="16" r="6" fill="#e94f7a" /><circle class="star" cx="192" cy="72" r="6" fill="#ff6b3d" /><circle class="star" cx="108" cy="72" r="5" fill="#ffb347" /><circle class="star" cx="244" cy="40" r="4" fill="#13a898" /><circle class="star" cx="56" cy="36" r="4" fill="#13a898" />
+          </g>)}
+          {v.id === "findings" && (<g>
+            {([[18,"#e94f7a",150],[44,"#ff6b3d",110],[70,"#ffb347",200],[96,"#13a898",80]] as [number, string, number][]).map(([y, c, w]) => (<g><circle class="star" cx="30" cy={y} r="6" fill={c} /><rect class="grow" x="46" y={y - 6} width={w} height="12" rx="6" fill={c} opacity=".8" /></g>))}
+          </g>)}
+          {v.id === "certainty" && (<g>
+            <circle cx="150" cy="60" r="16" fill="#13a898" opacity=".85" /><circle cx="150" cy="60" r="32" fill="none" stroke="#ffb347" stroke-width="2" stroke-dasharray="6 6" class="spin" /><circle cx="150" cy="60" r="50" fill="none" stroke="#6d5a49" stroke-width="2" stroke-dasharray="2 8" class="spin b" />
+            <circle class="star" cx="150" cy="44" r="3" fill="#fff" /><circle class="star" cx="118" cy="60" r="4" fill="#ffb347" /><circle class="star" cx="200" cy="60" r="4" fill="#b9a89a" />
+          </g>)}
+          {v.id === "tokens" && (<g>
+            <rect x="24" y="16" width="96" height="88" rx="8" fill="#1c1422" stroke="#6d5a49" />
+            {[28,42,56,70,84].map((y) => (<path d={`M36,${y} h72`} stroke="#6d5a49" stroke-width="3" />))}
+            <path class="flow" d="M124,60 H196" stroke="#ffb347" fill="none" stroke-width="2.4" />
+            <rect class="grow" x="200" y="42" width="76" height="36" rx="7" fill="#ffb347" /><text x="238" y="65" text-anchor="middle" fill="#160f05" font-size="12" font-weight="700">78 tokens</text>
+          </g>)}
+          {v.id === "code" && (<g>
+            <path d="M40,20 V100 M40,44 H90 M40,76 H90 M130,44 V100 M130,70 H176 M130,96 H176" stroke="#6d5a49" fill="none" stroke-width="2" />
+            {[[28,12,"#ffb347"],[90,34,"#13a898"],[90,66,"#13a898"],[176,60,"#8f73ff"],[176,86,"#8f73ff"]].map(([x, y, c]) => (<rect class="star" x={x as number} y={y as number} width="60" height="18" rx="5" fill="#1c1422" stroke={c as string} />))}
+          </g>)}
+          {v.id === "runs" && (<g>
+            <path d="M16,60 H284" stroke="#34253a" stroke-width="3" />
+            {[[40,"#13a898"],[120,"#13a898"],[200,"#13a898"],[270,"#ffb347"]].map(([x, c]) => (<circle cx={x as number} cy="60" r="9" fill={c as string} />))}
+            <circle class="comet" style="offset-path: path('M16,60 H284'); filter: drop-shadow(0 0 8px #ffb347)" r="6" fill="#ffd27a" />
+          </g>)}
+          {v.id === "capabilities" && (<g>
+            {[[60,34,"#ffb347"],[120,22,"#13a898"],[180,34,"#8f73ff"],[240,22,"#e94f7a"],[90,82,"#13a898"],[150,92,"#ffb347"],[210,82,"#8f73ff"]].map(([x, y, c]) => (<path class="star" d={`M${x},${(y as number) - 14} l12,7 v14 l-12,7 l-12,-7 v-14 z`} fill="#1c1422" stroke={c as string} stroke-width="2" />))}
+          </g>)}
+          {v.id === "workflows" && (<g>
+            {[[16,"#ffb347"],[116,"#13a898"],[216,"#8f73ff"]].map(([x, c]) => (<g><rect x={x as number} y="38" width="68" height="44" rx="8" fill="#1c1422" stroke={c as string} /><circle cx={x as number} cy="60" r="4" fill="#160f05" stroke={c as string} stroke-width="2" /><circle cx={(x as number) + 68} cy="60" r="4" fill="#160f05" stroke={c as string} stroke-width="2" /></g>))}
+            <path class="flow" d="M84,60 H116" stroke="#ffb347" fill="none" stroke-width="2.4" /><path class="flow" d="M184,60 H216" stroke="#13a898" fill="none" stroke-width="2.4" />
+          </g>)}
+          {v.id === "documents" && (<g>
+            <path d="M40,14 h46 l18,18 v74 h-64 z" fill="#1c1422" stroke="#b9a89a" /><path d="M50,48 h44 M50,62 h44 M50,76 h28" stroke="#b9a89a" stroke-width="2" />
+            <path class="flow" d="M108,60 C150,60 150,24 190,24" stroke="#ffb347" fill="none" stroke-width="2" /><path class="flow" d="M108,60 H190" stroke="#13a898" fill="none" stroke-width="2" /><path class="flow" d="M108,60 C150,60 150,96 190,96" stroke="#8f73ff" fill="none" stroke-width="2" />
+            <rect x="190" y="10" width="86" height="28" rx="6" fill="#261a2e" stroke="#ffb347" /><rect x="190" y="46" width="86" height="28" rx="6" fill="#261a2e" stroke="#13a898" /><rect x="190" y="82" width="86" height="28" rx="6" fill="#261a2e" stroke="#8f73ff" />
+          </g>)}
+          {v.id === "learning" && (<g>
+            <path d="M30,60 H270" stroke="#34253a" stroke-width="3" />
+            {[[30,"#13a898"],[110,"#13a898"],[190,"#ffb347"],[270,"#6d5a49"]].map(([x, c]) => (<circle class="star" cx={x as number} cy="60" r="11" fill="#1c1422" stroke={c as string} stroke-width="3" />))}
+            <circle class="comet" style="offset-path: path('M30,60 H190'); filter: drop-shadow(0 0 8px #ffb347)" r="6" fill="#ffd27a" />
           </g>)}
           {v.id === "tour" && (<g>
             <path d="M10,90 C60,10 120,110 180,40 S260,60 290,20" stroke="#34253a" fill="none" stroke-width="2" stroke-dasharray="4 6" />

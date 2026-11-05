@@ -2,7 +2,7 @@
 "use strict";
 
 (() => {
-  const { el, api, scoped, page, showError, views } = window.DevGuru;
+  const { el, api, scoped, page, showError, views, lantern: L } = window.DevGuru;
   const download = (name, text, type) => {
     const link = document.createElement("a");
     link.href = URL.createObjectURL(new Blob([text], { type }));
@@ -158,6 +158,11 @@
         canvas.append(box);
       });
       frame.replaceChildren(canvas);
+      for (const [i, edge] of (draft.edges || []).entries()) {
+        const path = canvas.querySelectorAll(".workflow-edge")[i];
+        if (path) { path.dataset.source = edge.source; path.dataset.target = edge.target; }
+      }
+      L.fx(canvas);
       if (focusAfter) { canvas.querySelector(focusAfter)?.focus(); focusAfter = null; }
     };
     return { frame, draw };
@@ -186,6 +191,13 @@
     const relink = () => { if (!linkedByHand) draft.edges = linkMatching(draft); drawLinks(); canvas.draw(); };
     const status = el("p", { class: "muted", id: "workflow-status", role: "status" });
     const canvas = workflowCanvas(draft, () => { linkedByHand = true; drawSteps(); drawLinks(); canvas.draw(); }, (text) => { status.textContent = text; });
+    const drawRail = () => {
+      const list = L.rail({ onSelect: (id) => { if (id.startsWith("preset:")) { document.querySelector("#workflow-preset").value = id.slice(7); load(JSON.parse(JSON.stringify(PRESETS[id.slice(7)]))); } else document.querySelector(`[data-id="${CSS.escape(id)}"]`)?.focus(); },
+        groups: [{ title: "Start from", items: [["blank", "A blank draft"], ["single", "One step"], ["review", "Plan, then review"]].map(([key, text]) => ({ id: `preset:${key}`, label: text, tone: "violet" })) },
+          { title: `Steps in this draft (${draft.nodes.length})`, items: draft.nodes.map((n) => ({ id: n.id, label: n.id, sub: n.capability_ref || "no capability yet", tone: n.capability_ref ? "teal" : "faint" })) },
+          { title: "Capabilities offered", items: offered.slice(0, 40).map((c) => ({ id: `offered:${c.ref || c.identity}`, label: String(c.identity || c.ref).split("/").pop(), sub: c.kind, tone: "saffron" })) }] });
+      return list;
+    };
     const drawSteps = () => {
       steps.replaceChildren(...draft.nodes.map((node, index) => {
         const set = (key, parse = (v) => v) => (event) => { node[key] = parse(event.target.value); relink(); };
@@ -215,6 +227,7 @@
       linkedByHand = !!next.edges; // an imported draft keeps the links it came with
       if (!next.edges) draft.edges = linkMatching(draft);
       canvas.draw();
+      drawRail();
       title.value = draft.title || "";
       identity.value = draft.workflow_id || "";
       drawSteps();
@@ -242,8 +255,10 @@
         showError(result, error);
       }
     };
-    const hint = el("p", { class: "muted", id: "workflow-canvas-hint", text: "Drag a step, or Tab to it and use the arrow keys. To link, choose an output and then an input of the same type, by click or Enter. Delete removes a step or link. Where steps sit isn't part of the workflow.", hidden: true });
-    canvas.frame.hidden = true;
+    const hint = el("p", { class: "muted", id: "workflow-canvas-hint", text: "Drag a step, or Tab to it and use the arrow keys. To link, choose an output and then an input of the same type, by click or Enter. Delete removes a step or link. Where steps sit isn't part of the workflow." });
+    const stageFrame = L.stage({ id: "workflow-stage", legend: [["a link between steps", "saffron"]] });
+    stageFrame.fill(canvas.frame);
+    steps.hidden = true;
     const importer = el("input", { type: "file", id: "workflow-import", accept: "application/json,.json", on: { change: async (event) => {
       const file = event.target.files[0];
       if (!file) return;
@@ -254,28 +269,30 @@
         showError(result, Object.assign(error, { code: "NOT_A_DRAFT" }));
       }
     } } });
-    root.append(options,
+    root.append(options, stageFrame.el,
       el("div", { class: "row" }, field("Title", title), field("ID", identity),
         field("Start from", el("select", { id: "workflow-preset", on: { change: (e) => load(JSON.parse(JSON.stringify(PRESETS[e.target.value]))) } },
           ...[["blank", "A blank draft"], ["single", "One step"], ["review", "Plan, then review"]].map(([value, text]) => el("option", { value, text }))))),
       el("div", { class: "row", role: "group", "aria-label": "How to edit" }, ...[["form", "Form"], ["canvas", "Canvas"]].map(([mode, text]) =>
-        el("button", { type: "button", class: "ghost", id: `workflow-mode-${mode}`, "aria-pressed": mode === "form" ? "true" : "false", text, on: { click: () => {
+        el("button", { type: "button", class: "chip", id: `workflow-mode-${mode}`, "aria-pressed": mode === "canvas" ? "true" : "false", text, on: { click: () => {
           steps.hidden = mode !== "form";
-          canvas.frame.hidden = mode !== "canvas";
+          stageFrame.el.hidden = mode !== "canvas";
           hint.hidden = mode !== "canvas";
           document.querySelector("#workflow-mode-form").setAttribute("aria-pressed", String(mode === "form"));
           document.querySelector("#workflow-mode-canvas").setAttribute("aria-pressed", String(mode === "canvas"));
           if (mode === "canvas") canvas.draw();
         } } }))),
-      steps, hint, canvas.frame, status,
+      steps, hint, status,
       el("div", { class: "row" },
         el("button", { type: "button", class: "ghost", id: "workflow-relink", text: "Link by type", on: { click: () => { linkedByHand = false; relink(); status.textContent = "Linked each input to the nearest earlier output of its type."; } } }),
-        el("button", { type: "button", class: "ghost", id: "workflow-add", text: "Add a step", on: { click: () => { draft.nodes.push(blankNode(draft.nodes.length + 1)); drawSteps(); drawLinks(); canvas.draw(); } } }),
+        el("button", { type: "button", class: "ghost", id: "workflow-add", text: "Add a step", on: { click: () => { draft.nodes.push(blankNode(draft.nodes.length + 1)); drawSteps(); drawLinks(); canvas.draw(); drawRail(); } } }),
         el("button", { type: "button", id: "workflow-preview", text: inReport() ? "Preview (needs dev serve)" : "Preview", on: { click: preview } }),
         el("button", { type: "button", class: "ghost", id: "workflow-export", text: "Export", on: { click: () => download(`${String(draft.workflow_id).replace(/[^\w-]+/g, "-")}.json`, JSON.stringify(draft, null, 2), "application/json") } }),
         field("Import", importer)),
-      links, result);
-    drawLinks();
+      result);
+    L.dock(el("div", { class: "detail" }, el("h2", { text: "This draft" }), links));
+    load(JSON.parse(JSON.stringify(PRESETS.review)));
+    document.querySelector("#workflow-preset").value = "review";
   };
 
   // ---------------------------------------------------------------- documentation
@@ -289,8 +306,7 @@
       showError(root, error);
       return;
     }
-    if (!files.length) { root.append(el("p", { id: "documents-none", text: "No Markdown files here." })); return; }
-    const result = el("div", { id: "document-result", "aria-live": "polite" });
+    if (!files.length) { L.nothing(root, "No Markdown files here.", "No Markdown files here."); root.append(el("p", { id: "documents-none", text: "No Markdown files here." })); return; }
     const build = (path, what) => async () => {
       result.replaceChildren(el("p", { class: "muted", text: `Building from ${path}...` }));
       try {
@@ -303,11 +319,29 @@
         showError(result, error);
       }
     };
+    const result = el("div", { id: "document-result", "aria-live": "polite" });
+    const frame = L.stage({ id: "documents-stage", compact: true, legend: [["what it can become", "saffron"]] });
+    let list = null;
+    const OUTPUTS = [["process", "Swimlanes and BPMN", "A numbered list where each step names who does it."], ["deck", "An offline deck", "Slides split on lines of ---."], ["diagram", "A diagram", "Only what the document states, and cited."]];
+    const show = (path) => {
+      const f = files.find((x) => x.path === path);
+      if (!f) return;
+      list?.select(path);
+      const picture = L.radial({ center: path.split("/").pop(), sub: `${f.lines} lines`, label: `What ${path} can become`,
+        items: OUTPUTS.map(([what, label, sub], i) => ({ id: what, label, sub, tone: L.toneOf(i), big: true })),
+        onSelect: (what) => { picture.select(what); build(path, what)(); } });
+      frame.fill(picture.canvas);
+      L.dock(L.detail({ title: path.split("/").pop(), where: path, facts: [[f.lines, "Lines"]], actions: OUTPUTS.map(([what, label]) => el("button", { type: "button", class: "btn", text: label, on: { click: build(path, what) } })) }, result));
+    };
+    root.append(frame.el);
+    list = L.rail({ search: true, placeholder: "Find a file", onSelect: show, groups: [{ title: "Markdown files", items: files.map((f) => ({ id: f.path, label: f.path.split("/").pop(), sub: f.path, count: f.lines })) }] });
+    L.walk({ into: frame.el, go: show, steps: files.slice(0, 8).map((f) => ({ id: f.path, text: `${f.path}: ${f.lines} lines, ready to become a process, a deck or a diagram.` })) });
     root.append(table("documents", ["File", "Lines", "", "", ""], files.map((f) => [f.path, f.lines,
       el("button", { type: "button", class: "ghost", text: "Make a process", "aria-label": `Make a process from ${f.path}`, on: { click: build(f.path, "process") } }),
       el("button", { type: "button", class: "ghost", text: "Make a deck", "aria-label": `Make a deck from ${f.path}`, on: { click: build(f.path, "deck") } }),
       el("button", { type: "button", class: "ghost", text: "Make a diagram", "aria-label": `Make a diagram from ${f.path}`, on: { click: build(f.path, "diagram") } })])),
-    result, el("p", { class: "muted", text: "A deck splits on lines of ---. A diagram draws only what the document states, and cites it. A process reads a numbered list where each step names who does it, as 1. Sales: Receive the order, and gives swimlanes and BPMN." }));
+    el("p", { class: "muted", text: "A deck splits on lines of ---. A diagram draws only what the document states, and cites it. A process reads a numbered list where each step names who does it, as 1. Sales: Receive the order, and gives swimlanes and BPMN." }));
+    show(files[0].path);
   };
 
   // ---------------------------------------------------------------- learning review
@@ -318,13 +352,36 @@
     try {
       if (!wanted) {
         const found = (await api(scoped("/api/v1/learning"))).candidates;
+        const frame = L.stage({ id: "learning-stage", compact: true });
+        frame.fill(L.pipeline({ label: "How something learned becomes reusable", steps: [
+          { id: "capture", label: "Captured", sub: "ananke learning capture", tone: found.length ? "teal" : "faint", waiting: !found.length },
+          { id: "evaluate", label: "Evaluated", sub: "against its cases", tone: "faint", waiting: true },
+          { id: "review", label: "Reviewed", sub: "here, by you", tone: "faint", waiting: true },
+          { id: "promote", label: "Promoted", sub: "only if you say so", tone: "faint", waiting: true },
+        ] }).canvas);
+        root.append(frame.el);
+        L.rail({ groups: [{ title: "Candidates", items: found.map((name) => ({ id: name, label: name, href: `#/learning?${new URLSearchParams({ name })}`, tone: "saffron" })) }], note: "No candidates yet." });
+        L.dock(L.detail({ title: "Nothing becomes reusable by itself", note: "A candidate has to pass Ananke's gate, then you decide. Rejecting never publishes." }));
         root.append(found.length
           ? table("learning-list", ["Candidate"], found.map((name) => [el("a", { href: `#/learning?${new URLSearchParams({ name })}`, text: name })]))
           : el("p", { id: "learning-none", text: "No candidates yet. Ananke creates one with ananke learning capture." }));
         return;
       }
       const c = await api(scoped(`/api/v1/learning/${encodeURIComponent(wanted)}`));
-      root.append(el("p", {}, el("a", { href: "#/learning", text: "All candidates" })), el("h2", { id: "candidate-name", text: c.name }),
+      const everyone = (await api(scoped("/api/v1/learning"))).candidates;
+      L.rail({ groups: [{ title: "Candidates", items: everyone.map((name) => ({ id: name, label: name, href: `#/learning?${new URLSearchParams({ name })}`, tone: "saffron" })) }] }).select(c.name);
+      const frame = L.stage({ id: "learning-stage", compact: true });
+      const hasCases = c.cases.length > 0;
+      const passes = !c.problems.length;
+      frame.fill(L.pipeline({ label: `Where ${c.name} has got to`, steps: [
+        { id: "capture", label: "Captured", tone: "teal" },
+        { id: "evaluate", label: "Evaluated", sub: hasCases ? `${c.cases.length} cases` : "no evidence yet", tone: hasCases ? "teal" : "faint", waiting: !hasCases },
+        { id: "gate", label: "Ananke's gate", sub: passes ? "no problems" : `${c.problems.length} problems`, tone: passes ? "teal" : "rose" },
+        { id: "promote", label: "Promoted", sub: "only if you say so", tone: "faint", waiting: true },
+      ] }).canvas);
+      L.tools(el("a", { class: "chip", href: "#/learning", text: "‹ All candidates" }));
+      L.dock(L.detail({ title: c.name, facts: [[c.cases.length, "Cases"], [c.problems.length, "Problems"], [c.destinations.length, "Destinations"]] }, el("h3", { class: "eyebrow", text: "To decide" }), el("pre", { class: "source" }, el("code", { text: `ananke learning review ${c.name}\nananke learning promote ${c.name}` }))));
+      root.append(frame.el, el("h2", { id: "candidate-name", text: c.name }),
         c.problems.length
           ? el("div", { class: "card warning", id: "candidate-problems" }, el("strong", { text: "Not ready" }), el("ul", {}, ...c.problems.map((p) => el("li", { text: p }))))
           : el("p", { id: "candidate-ready", text: "Ananke's gate found no problems." }),

@@ -5,8 +5,20 @@ description: Every view in the Dev Guru explorer report, what it shows and the q
 
 # The explorer
 
-`dev explore` writes one HTML file with six views over the same data. Each one answers a different question about
-the codebase.
+`dev explore` writes one HTML file with 25 views over the same data. Each one answers a different question about
+the codebase, and `dev serve` shows the same pages live. Six are drawn from the code graph alone, and the other 19 come
+from the repository analysis.
+
+Every view is laid out the same way:
+
+- **The rail, on the left,** lists what's in the view, with a search box and a few places to start.
+- **The stage, in the middle,** is a live drawing. Hover anything and what it connects to lights up, with light
+  travelling along the lines. Drag to move around, use **+**, **−** and **⤢** to zoom and fit, or hold `Ctrl` or `⌘` and
+  scroll.
+- **The inspector, on the right,** explains whatever you select, with its source where there is any.
+- **Walk through** moves through the view's main items and says what each one is. Any click hands control back to you.
+
+With reduced motion, nothing moves and everything still works.
 
 ```mermaid
 flowchart LR
@@ -18,6 +30,38 @@ flowchart LR
   M --> H[Hotspots]
   M --> T[Tour]
 ```
+
+## The views that come from the analysis
+
+| View | Its stage | Its rail |
+| --- | --- | --- |
+| Overview | Every view round the repository, coloured by what it found | Each view, with a line about it |
+| Code map | Folders, files and functions, with links across folders and to tables | Folders, files and tables |
+| End-to-end flows | One flow, which lights up as you step along it | Flows, and calls that lead nowhere |
+| Notebooks | How the notebooks feed each other | Notebooks by folder |
+| Data | The ERD, with each table's keys lit | Tables, most connected first |
+| API pathways | Callers, routes and handlers in three columns | Routes by path |
+| Architecture | The inferred CALM model | Components |
+| Quality | Files sized by lines, coloured by complexity | Most complex functions, largest files |
+| Coverage | Files sized by lines, coloured by coverage | Files, least covered first |
+| CVEs | Vulnerable packages round your dependencies | Advisories, worst first |
+| Findings | Scanner findings and failing tests, by severity | Failing tests, then findings |
+| What's certain | Each view, by how far it can be trusted | Views, with their limits |
+| Saving tokens | Each question, and the cheapest tool for it | Questions |
+| Code | The code graph at the level you choose | Items by kind |
+| Runs | The latest runs, in order | Runs, newest first |
+| Capabilities | What your sources offer, by kind | Capabilities by kind |
+| Workflows | A canvas you can edit by mouse or keyboard | Starting points, steps and what's offered |
+| Documentation | What a Markdown file can become | Markdown files |
+| Learning review | How far a candidate has got | Candidates |
+
+Where something isn't known, the stage says so rather than draw it as empty or clean. A report can't start anything, so
+actions such as Preview or Analyse ask you to use `dev serve`.
+
+## Embedding a report in a page
+
+Frame a report with `#view=constellation&embed=1` and it shows only the tabs and the stage. Add `&play=1` and it shows each
+view in turn until someone clicks, scrolls or presses a key inside it. Reduced motion turns playing off.
 
 ## ✦ Constellation: what's here?
 

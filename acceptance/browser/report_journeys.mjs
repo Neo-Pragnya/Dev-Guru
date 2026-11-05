@@ -162,6 +162,26 @@ await journey("every page of dev serve is in the file, works, and fetches nothin
     await shot(`tab-${id}`);
     seen.push(id);
   }
+  // every page looks like the first six: a filled rail, a stage, a filled inspector, and the same palette
+  const shell = await inner(`(() => { const box = (s) => { const n = doc.querySelector(s); if (!n) return null; const r = n.getBoundingClientRect(); return { w: r.width, h: r.height, text: n.textContent.trim().length }; }; return { rail: box("#rail"), stage: box(".lstage"), dock: box("#dock"), font: getComputedStyle(doc.body).fontFamily, ink: getComputedStyle(doc.documentElement).getPropertyValue("--saffron").trim() }; })()`);
+  expect(shell.rail && shell.stage && shell.dock, `the shared layout is missing: ${JSON.stringify(shell)}`);
+  const layoutProblems = [];
+  for (const id of seen) {
+    await evaluate(`document.querySelector('.tab[data-view="${id}"]').click()`);
+    await sleep(600);
+    const p = await inner(`(() => { const box = (s) => { const n = doc.querySelector(s); if (!n) return null; const r = n.getBoundingClientRect(); return { w: r.width, h: r.height, text: n.textContent.trim().length }; }; const lit = doc.querySelectorAll(".lstage .pulse, .lstage .tm-cell, .lstage .flame-big, .lstage .selected, .lstage .rcore").length; return { rail: box("#rail"), stage: box(".lstage"), dock: box("#dock"), lit, parts: doc.querySelectorAll(".tree-item, .rail-note").length }; })()`);
+    if (!p.stage || p.stage.h < 200) layoutProblems.push(`${id}: no stage`);
+    else if (p.rail.w < 150 || p.parts === 0) layoutProblems.push(`${id}: empty rail`);
+    else if (p.dock.w < 150 || p.dock.text < 3) layoutProblems.push(`${id}: empty inspector`);
+    else if (p.lit === 0) layoutProblems.push(`${id}: nothing moves`);
+  }
+  expect(!layoutProblems.length, layoutProblems.join("; "));
+  // at a tablet's width the inspector moves under the page, and never over it
+  await viewport(1000, 800);
+  await sleep(200);
+  const overlap = await inner(`(() => { const main = doc.querySelector("#main").getBoundingClientRect(); const dock = doc.querySelector("#dock").getBoundingClientRect(); return dock.top < main.bottom - 1 && dock.left < main.right - 1; })()`);
+  await viewport(1440, 900);
+  expect(!overlap, "the inspector sits on top of the page at a tablet's width");
   if (args.includes("--full")) {
     const look = async (id, expr, what) => { await evaluate(`document.querySelector('.tab[data-view="${id}"]').click()`); await sleep(500); expect(await inner(expr), what); };
     await look("codemap", `doc.querySelectorAll(".graph .edge").length > 5`, "the code map has no links");
@@ -186,6 +206,28 @@ await journey("every page of dev serve is in the file, works, and fetches nothin
     expect(await evaluate(`document.querySelector("#serveFrame").hidden && !document.querySelector(".workspace").hidden`), "the explorer doesn't come back");
   }
   return `${seen.length} pages`;
+});
+await journey("framed in a page, each view fills the frame, and it plays until someone reaches for it", async () => {
+  await viewport(578, 330);
+  await send("Page.navigate", { url: "about:blank" }); // a new hash alone wouldn't load it afresh
+  await sleep(100);
+  await go("#view=constellation&embed=1&play=1", 700);
+  const first = await evaluate(`document.querySelector('.tab[aria-selected="true"]').dataset.view`);
+  const row = await evaluate(`(() => { const t = document.querySelector("#tabs").getBoundingClientRect(); const s = document.querySelector("#stage").getBoundingClientRect(); return { tabs: t.height, stage: s.height, right: s.right, width: innerWidth }; })()`);
+  expect(row.tabs < 60, `the tabs take ${row.tabs}px of the frame`);
+  expect(row.stage > 150, `the stage is only ${row.stage}px tall`);
+  expect(row.right <= row.width, `the stage runs off the frame: ${row.right} of ${row.width}`);
+  await sleep(5600);
+  const next = await evaluate(`document.querySelector('.tab[aria-selected="true"]').dataset.view`);
+  expect(next !== first, "it didn't move on");
+  await send("Input.dispatchMouseEvent", { type: "mousePressed", x: 300, y: 200, button: "left", clickCount: 1 });
+  await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: 300, y: 200, button: "left", clickCount: 1 });
+  await sleep(5600);
+  expect((await evaluate(`document.querySelector('.tab[aria-selected="true"]').dataset.view`)) === next, "it kept going after a click");
+  await viewport(1440, 900);
+  await send("Page.navigate", { url: "about:blank" });
+  await sleep(100);
+  return `${first} to ${next}, then held`;
 });
 await journey("a phone-width screen has no horizontal scroll", async () => {
   await viewport(390, 844, true); await go("", 1500);
