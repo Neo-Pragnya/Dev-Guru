@@ -10,6 +10,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
 
 ### Added
 
+- **Finding records from the release gate,** as in Ananke:
+  - `findings.json`, with provenance and a CycloneDX SBOM;
+  - exceptions with an owner and a review date, which block once expired;
+  - degraded scans that fail in CI. CI installs Grype, Syft and osv-scanner, pinned and sha256-checked.
+- **CODEOWNERS** for the gate's exceptions, the gate and the workflows.
+- **Guide: Security findings.**
+
+### Added
+
 - **An opt-in pre-push hook** (`pre-commit install --hook-type pre-push`): osv-scanner on the lock files and Semgrep's security rules.
 - **The release gate accepts a reviewed Bandit HIGH finding** by test id and file, with a reason.
 
