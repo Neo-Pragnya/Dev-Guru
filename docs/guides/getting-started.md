@@ -15,6 +15,16 @@ dev --version
 dev doctor
 ```
 
+**Behind a package firewall.** Some firewalls block any version published in the last week or two. If a dependency,
+such as `pydantic`, has a release that new, installing Dev Guru fails even though Dev Guru is allowed. uv can skip just
+those packages' newest releases:
+
+```bash
+uv pip install dev-guru --exclude-newer-package pydantic=2026-10-22 --exclude-newer-package pydantic-core=2026-10-22
+```
+
+The release's scan report lists which dependencies were days old, with the exact command.
+
 `dev doctor` confirms the Ananke version is in the supported range and that the capabilities Dev Guru calls are
 present:
 

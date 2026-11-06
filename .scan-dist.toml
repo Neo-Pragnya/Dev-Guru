@@ -10,3 +10,11 @@ capability-process-spawn = "a JavaScript regular expression's .exec() in gateway
 [heuristics.threat-filesystem-read]
 reason = "tests that hostile paths such as ../../etc/passwd and .env are refused, and that an error never reaches the browser"
 paths = ["tests/test_gateway.py"]
+
+[[licence]]
+package = "certifi"
+reason = "Mozilla's CA bundle, MPL-2.0, pulled in by httpx through Ananke; file-level copyleft on certifi's own files, used unmodified"
+
+[[mention]]
+path = "*tests/test_context_command.py"
+reason = "a test that checks the context command reports another tool's licence; Dev Guru is Apache-2.0"

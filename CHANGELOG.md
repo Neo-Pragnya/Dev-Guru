@@ -10,6 +10,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
 
 ---
 
+## [0.11.2] — 2026-11-05
+
+### Fixed
+
+- **Metadata a scanner may not read.** Wheels and sdists were built with Metadata-Version 2.5, which older SCA parsers reject, so they can't identify the package. Dev Guru now writes 2.4, with a licence classifier as well as `License-Expression`.
+- Needs Ananke 0.3.32, which has the same fix and no longer allows vulnerable Jinja2 releases.
+
+### Added
+
+- **The release gate checks what Black Duck and similar tools check:** metadata, the oldest versions each range allows, every dependency's licence, and licence names in shipped files. It reports dependencies under 14 days old. Firewalls with a maturity rule block those, so installing Dev Guru fails even when it's allowed. The guide gives the command that avoids them.
+
+---
+
 ## [0.11.1] — 2026-11-05
 
 ### Fixed

@@ -14,6 +14,7 @@ authors = [{ name = "Neo Pragnya" }]
 keywords = ["developer-tools", "code-understanding", "ananke", "agents", "reports"]
 classifiers = [
   "Development Status :: 2 - Pre-Alpha",
+  "License :: OSI Approved :: Apache Software License",
   "Environment :: Console",
   "Intended Audience :: Developers",
   "Operating System :: OS Independent",
@@ -28,7 +29,7 @@ classifiers = [
 # Dev Guru is a client of Ananke: the harness owns analysis, execution and evidence (docs/architecture.md).
 # Keep this range in step with SUPPORTED_ANANKE in src/dev_guru/client/negotiation.py (tests/test_packaging.py).
 dependencies = [
-  "ananke-plexus>=0.3.30,<0.4",
+  "ananke-plexus>=0.3.32,<0.4",
   "markdown-it-py>=3,<5",
   "pydantic>=2.11,<3",
   "rich>=13",
@@ -64,8 +65,11 @@ path = "src/dev_guru/version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/dev_guru"]  # includes reports/assets (the explorer page, styles and script)
+# 2.4 is the newest metadata most SCA parsers read; 2.5 made firewalls see an unknown component
+core-metadata-version = "2.4"
 
 [tool.hatch.build.targets.sdist]
+core-metadata-version = "2.4"
 # Anchored: an unanchored "src" also matched website/node_modules/*/src and shipped 2,754 npm files.
 include = ["/src", "/tests", "/README.md", "/LICENSE", "/CHANGELOG.md"]
 
