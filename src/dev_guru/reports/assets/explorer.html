@@ -71,11 +71,13 @@
 </div>
 <div class="modal" id="about" role="dialog" aria-modal="true" aria-labelledby="aboutTitle" hidden><div class="modal-box" id="aboutBody"></div></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
-<script type="application/json" id="dg-data">{{DATA}}</script>
-<script type="application/json" id="dg-manifest">{{MANIFEST}}</script>
-<script type="application/json" id="dg-serve">{{SERVE_DATA}}</script>
-<script type="application/json" id="dg-serve-shell">{{SERVE_SHELL}}</script>
-<script type="application/json" id="dg-live">{{LIVE}}</script>
-<script>{{JS}}</script>
+<!-- The placeholders below are filled by reports/render.py: safe_json escapes < > & and U+2028/9, so text never
+     closes a script (tests/test_reports.py), and the last one is this package's own explorer.js. -->
+<script type="application/json" id="dg-data">{{DATA}}</script><!-- nosemgrep: generic.html-templates.security.var-in-script-tag.var-in-script-tag -->
+<script type="application/json" id="dg-manifest">{{MANIFEST}}</script><!-- nosemgrep: generic.html-templates.security.var-in-script-tag.var-in-script-tag -->
+<script type="application/json" id="dg-serve">{{SERVE_DATA}}</script><!-- nosemgrep: generic.html-templates.security.var-in-script-tag.var-in-script-tag -->
+<script type="application/json" id="dg-serve-shell">{{SERVE_SHELL}}</script><!-- nosemgrep: generic.html-templates.security.var-in-script-tag.var-in-script-tag -->
+<script type="application/json" id="dg-live">{{LIVE}}</script><!-- nosemgrep: generic.html-templates.security.var-in-script-tag.var-in-script-tag -->
+<script>{{JS}}</script><!-- nosemgrep: generic.html-templates.security.var-in-script-tag.var-in-script-tag -->
 </body>
 </html>
