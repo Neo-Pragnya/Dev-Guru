@@ -8,6 +8,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
 
 ## [Unreleased]
 
+---
+
+## [0.11.3] — 2026-11-06
+
+### Changed
+
+- **Trial: `pydantic>=2.11,<2.14.3`, and Ananke 0.3.33 or later.** Every release after pydantic 2.14.3 and pydantic-core 2.50.4 (5 November, 09:17 UTC) was quarantined, and none before. See Ananke 0.3.33; the cap is reverted if quarantines continue.
+- **The sdist no longer carries the tests.** They contain hostile test inputs (such as `../../etc/passwd` and `.env` paths, which the gateway must refuse) and another tool's licence name, which scanners read as findings. They stay in the repository.
+
 ### Added
 
 - **Finding records from the release gate,** as in Ananke:

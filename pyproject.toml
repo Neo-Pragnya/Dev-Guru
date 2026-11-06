@@ -29,9 +29,11 @@ classifiers = [
 # Dev Guru is a client of Ananke: the harness owns analysis, execution and evidence (docs/architecture.md).
 # Keep this range in step with SUPPORTED_ANANKE in src/dev_guru/client/negotiation.py (tests/test_packaging.py).
 dependencies = [
-  "ananke-plexus>=0.3.32,<0.4",
+  "ananke-plexus>=0.3.33,<0.4",
   "markdown-it-py>=3,<5",
-  "pydantic>=2.11,<3",
+  # TRIAL (0.11.3): see the same cap and its reason in Ananke 0.3.33. Revert to <3 if quarantines continue,
+  # or once pydantic 2.14.3 is two weeks old (2026-11-19).
+  "pydantic>=2.11,<2.14.3",
   "rich>=13",
   "typer>=0.16,<1",
 ]
@@ -71,7 +73,7 @@ core-metadata-version = "2.4"
 [tool.hatch.build.targets.sdist]
 core-metadata-version = "2.4"
 # Anchored: an unanchored "src" also matched website/node_modules/*/src and shipped 2,754 npm files.
-include = ["/src", "/tests", "/README.md", "/LICENSE", "/CHANGELOG.md"]
+include = ["/src", "/README.md", "/LICENSE", "/CHANGELOG.md"]  # tests stay in git, not the sdist
 
 [tool.ruff]
 line-length = 100

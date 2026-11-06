@@ -9,7 +9,7 @@ resolution-markers = [
 
 [[package]]
 name = "ananke-plexus"
-version = "0.3.32"
+version = "0.3.33"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
@@ -22,9 +22,9 @@ dependencies = [
     { name = "rich" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ad/70/68f3611fab9f08c6dc5b9a6e9fd5a8245bfd365b21d517b842e9c920b1dc/ananke_plexus-0.3.32.tar.gz", hash = "sha256:3fbf757d9ccbd9f6fea02f8f8c2ee759e537fcb398f3fb24bb27b659dfe953e9", size = 6928539, upload-time = "2026-11-06T00:34:22.096Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/31/8d/3de5234ff78434cbf2461ed3af4e99d9dbe44d5481ccf5b98a35fd487e7a/ananke_plexus-0.3.33.tar.gz", hash = "sha256:0d0d582f11bde4aede0d52e53a87f1851e0b7821cfdf553aa1aba41f3e32a470", size = 6930706, upload-time = "2026-11-06T05:39:59.915Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/26/20/f41f14ce761fe6e1ed510cb3017f5a6b5851814cb38b7d027827676b6855/ananke_plexus-0.3.32-py3-none-any.whl", hash = "sha256:8391e9f53fcbe21b10a6b08612e28b64b49e0e9d14abece73b1e6db1bfd9c968", size = 3971532, upload-time = "2026-11-06T00:34:19.502Z" },
+    { url = "https://files.pythonhosted.org/packages/4b/60/a9e8865bde668d3a86b1a9543a46b95a50cb6bcb75b2e9df47aae704267a/ananke_plexus-0.3.33-py3-none-any.whl", hash = "sha256:046effb560a20d215782d6dd0a4ff6ef6ee9316186faa68625d9be775f3591a6", size = 3974174, upload-time = "2026-11-06T05:39:57.789Z" },
 ]
 
 [[package]]
@@ -295,12 +295,12 @@ dex = [
 
 [package.metadata]
 requires-dist = [
-    { name = "ananke-plexus", specifier = ">=0.3.32,<0.4" },
+    { name = "ananke-plexus", specifier = ">=0.3.33,<0.4" },
     { name = "dex-trove", marker = "extra == 'dex'", specifier = ">=0.1.6" },
     { name = "hatchling", marker = "extra == 'dev'", specifier = ">=1.26" },
     { name = "markdown-it-py", specifier = ">=3,<5" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.15" },
-    { name = "pydantic", specifier = ">=2.11,<3" },
+    { name = "pydantic", specifier = ">=2.11,<2.14.3" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8" },
     { name = "pytest-bdd", marker = "extra == 'dev'", specifier = ">=8" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=6" },
