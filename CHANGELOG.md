@@ -8,6 +8,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
 
 ## [Unreleased]
 
+### Added
+
+- **An opt-in pre-push hook** (`pre-commit install --hook-type pre-push`): osv-scanner on the lock files and Semgrep's security rules.
+- **The release gate accepts a reviewed Bandit HIGH finding** by test id and file, with a reason.
+
+### Changed
+
+- The explorer template's six script placeholders are marked as reviewed for Semgrep's `var-in-script-tag`. `safe_json` escapes what could close a script, and a test proves it.
+
 ---
 
 ## [0.11.2] — 2026-11-05
