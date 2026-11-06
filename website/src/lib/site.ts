@@ -83,7 +83,8 @@ export const DOC_NAV: { section: string; items: string[]; shapes: string; tint: 
       "guides/gateway",
       "guides/repository-views",
       "guides/notebooks",
-      "guides/business-processes"
+      "guides/business-processes",
+      "guides/security-findings"
     ],
     "shapes": "hex>flower8",
     "tint": "lemon"
@@ -116,6 +117,7 @@ export const DOC_TITLES: Record<string, string> = {
   "concepts/architecture": "Architecture",
   "concepts/report-safety": "Report safety",
   "guides/explorer": "The explorer",
+  "guides/security-findings": "Security findings",
   "guides/getting-started": "Getting started",
   "guides/presentations": "Presentations",
   "guides/diagrams": "Diagrams from documents",
