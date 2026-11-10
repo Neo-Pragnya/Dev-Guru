@@ -183,4 +183,37 @@ def export_html(
     return page, sidecar
 
 
-__all__ = ["ExploreResult", "explore", "explorer_model", "export_html"]
+def graph_export(
+    workspace: Path,
+    *,
+    client: AnankeClient | None = None,
+    level: str = "file",
+    focus: str | None = None,
+    depth: int = 1,
+    budget: int = 40,
+    name: str | None = None,
+) -> dict[str, Any]:
+    """A bounded piece of the code graph (``dev-guru/subgraph@1``), ready for Mermaid or SVG.
+
+    It builds the graph and nothing else: no repository analysis and no run record, so it's quick to call again
+    with a bigger depth or budget.
+    """
+    from dev_guru.reports import subgraph
+
+    client = client or connect()
+    root = workspace.expanduser().resolve()
+    graph = client.graph_data(root)
+    model = view_model.build(graph, root, project_name=name)
+    if not model["files"]:
+        raise errors.GuruError(
+            errors.WORKSPACE_INVALID,
+            f"Ananke found no source files in {root}",
+            hint="point dev graph at a folder with Python, JavaScript or TypeScript files, or notebooks",
+        )
+    try:
+        return subgraph.select(model, level=level, focus=focus, depth=depth, budget=budget)
+    except subgraph.SubgraphError as exc:
+        raise errors.GuruError(errors.INVALID_INPUT, str(exc)) from exc
+
+
+__all__ = ["ExploreResult", "explore", "explorer_model", "export_html", "graph_export"]

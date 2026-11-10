@@ -23,6 +23,7 @@ print(result.manifest["input_digest"])
 | `.doctor()` | `HarnessInfo`: Ananke version, supported range, capabilities, reasons if incompatible |
 | `.explore(name=None)` | `ExploreResult`: the view model (`dev-guru/explorer@1`), its manifest and the transport |
 | `.export(result, output=..., format="html")` | the path of the written report (a manifest goes next to it) |
+| `.export(result, output=..., format="mermaid", focus=..., depth=..., budget=..., level=...)` | the path of a code-graph drawing: `mermaid`, `svg` or `json` (see `dev graph`) |
 
 ## Errors
 

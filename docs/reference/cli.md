@@ -96,6 +96,20 @@ An animated SVG of the relationships a document states, each cited by file and l
 [Diagrams from documents](../guides/diagrams.md). Exit `2` when the document has no explicit relationships or a file is
 missing or malformed.
 
+## `dev graph`
+
+```text
+dev graph [WORKSPACE] [--level package|file|symbol] [--focus NAME] [--depth N] [--budget N]
+          [-f, --format mermaid|svg|json] [-o, --output FILE] [--static] [--name NAME]
+```
+
+A piece of the code graph small enough to read: everything within `--depth` steps of `--focus` (an id, a path, a
+file name or a symbol name), at most `--budget` nodes (default 40, up to 400). Without `--focus`, the best-connected
+nodes. A node marked `+N` has N neighbours that weren't drawn, and the command that shows them is printed to stderr
+(`more: dev graph ...`). Imports and calls between the same two nodes share one edge (`imports · 3 calls`); inferred
+calls are dashed. Prints Mermaid by default. Exit `2` for an unknown or ambiguous focus, a budget out of range, or a
+folder with no source files. See [Diagrams](../guides/diagrams.md#the-code-graph).
+
 ## `dev present`
 
 ```text

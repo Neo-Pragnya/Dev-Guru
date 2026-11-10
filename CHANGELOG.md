@@ -8,6 +8,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
 
 ## [Unreleased]
 
+### Added
+
+- **`dev graph`:** part of the code graph as Mermaid, SVG or JSON. Choose a level (package, file or symbol), a focus,
+  a depth and a node budget. Nodes with neighbours left out show `+N`, and the command that draws them is printed, so a
+  diagram grows a step at a time. Imports and calls between two nodes share one edge; inferred calls are dashed. The
+  SDK's `export()` takes the same formats.
+- **Contract tests for the explorer view model:** it round-trips through the page, keeps its ids when unrelated
+  files change, and every edge, snippet, hotspot and insight points at something real.
+
+### Fixed
+
+- Diagram labels moved clear of each other no longer fall outside the SVG.
+
 ---
 
 ## [0.11.3] — 2026-11-06

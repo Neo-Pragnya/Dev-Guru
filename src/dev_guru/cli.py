@@ -446,6 +446,74 @@ def bpmn(
 
 
 @app.command()
+def graph(
+    workspace: Annotated[Path, typer.Argument(help="Project to draw")] = Path("."),
+    level: Annotated[str, typer.Option(help="package, file or symbol")] = "file",
+    focus: Annotated[
+        str | None,
+        typer.Option(help="Start here: an id, a path, a file name or a symbol name"),
+    ] = None,
+    depth: Annotated[int, typer.Option(help="How many steps out from --focus")] = 1,
+    budget: Annotated[int, typer.Option(help="The most nodes to draw (1 to 400)")] = 40,
+    fmt: Annotated[str, typer.Option("--format", "-f", help="mermaid, svg or json")] = "mermaid",
+    output: Annotated[
+        Path | None, typer.Option("--output", "-o", help="Write here instead of printing")
+    ] = None,
+    static: Annotated[bool, typer.Option("--static", help="SVG without animation")] = False,
+    name: Annotated[str | None, typer.Option(help="Project name shown in the drawing")] = None,
+    transport: TransportOpt = "in-process",
+) -> None:
+    """Draw part of the code graph as Mermaid or SVG, small enough to read and expand a step at a time.
+
+    Nodes marked +N have N neighbours that weren't drawn; the output names the command that shows them.
+    Inferred calls are dashed.
+    """
+    from dev_guru.diagram import svg_problems
+    from dev_guru.reports import subgraph
+
+    if fmt not in subgraph.FORMATS:
+        typer.echo(
+            f"error: unknown format {fmt!r}; choose {', '.join(subgraph.FORMATS)} ({errors.INVALID_INPUT})",
+            err=True,
+        )
+        raise typer.Exit(2)
+    try:
+        sub = service.graph_export(
+            workspace,
+            client=connect(transport),
+            level=level,
+            focus=focus,
+            depth=depth,
+            budget=budget,
+            name=name,
+        )
+    except errors.GuruError as exc:
+        typer.echo(f"error: {exc.message} ({exc.code})", err=True)
+        raise typer.Exit(2) from exc
+    if fmt == "json":
+        text = json.dumps(sub, indent=2, ensure_ascii=False) + "\n"
+    elif fmt == "svg":
+        text = subgraph.to_svg(sub, animate=not static)
+        problems = svg_problems(text)
+        if problems:  # never write an unsafe SVG, whatever the names in the code
+            typer.echo("error: " + "; ".join(problems), err=True)
+            raise typer.Exit(1)
+    else:
+        text = subgraph.to_mermaid(sub)
+    if output:
+        output.write_text(text, encoding="utf-8")
+        typer.echo(
+            f"Wrote {output}: {len(sub['nodes'])} nodes, {len(sub['edges'])} edges"
+            + (f", {sub['omitted']['nodes']} not drawn" if sub["omitted"]["nodes"] else ""),
+            err=True,
+        )
+    else:
+        typer.echo(text, nl=False)
+    if sub["expand"]:
+        typer.echo(f"more: {sub['expand']}", err=True)
+
+
+@app.command()
 def diagram(
     document: Annotated[Path, typer.Argument(help="An approved Markdown document")],
     output: Annotated[

@@ -46,3 +46,24 @@ is drawn as a **hypothesis**: dashed, with a "?", and counted in the summary. It
 The SVG has no scripts, event handlers or external references, and every label is escaped text. The command checks
 this before writing. The same document always gives the same bytes. Animation stops under reduced motion or with
 `--static`.
+
+## The code graph
+
+`dev diagram` draws what a document says. `dev graph` draws what the code does, from Ananke's graph, and never
+more than you ask for:
+
+```bash
+dev graph . --level package                          # how the packages depend on each other
+dev graph . --focus service.py                       # one file and its neighbours, as Mermaid
+dev graph . --focus service.py --depth 2 --budget 80 # one more ring out
+dev graph . --level symbol --focus explore -f svg -o explore.svg
+```
+
+- **Expanding:** a node marked `+3` has three neighbours left out. The command that draws them is printed to stderr
+  (`more: dev graph ... --depth 2 --budget 80`), so you can grow a diagram a step at a time.
+- **Edges:** imports and calls between the same two nodes are one edge, labelled `imports · 3 calls`. A call Ananke
+  inferred through imports is dashed.
+- **Formats:** Mermaid (paste it into Markdown on GitHub or the docs site), SVG (static with `--static`, checked for
+  scripts and external references before it's written) and JSON (`dev-guru/subgraph@1`).
+- **SDK:** `guru.export(result, output="graph.mmd", format="mermaid", focus="service.py", depth=2)`.
+
