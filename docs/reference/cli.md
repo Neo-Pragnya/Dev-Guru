@@ -110,6 +110,26 @@ nodes. A node marked `+N` has N neighbours that weren't drawn, and the command t
 calls are dashed. Prints Mermaid by default. Exit `2` for an unknown or ambiguous focus, a budget out of range, or a
 folder with no source files. See [Diagrams](../guides/diagrams.md#the-code-graph).
 
+## `dev docs`
+
+```text
+dev docs [WORKSPACE] [--audience novice|practitioner|principal|executive] [--detail brief|standard|deep]
+         [-f, --format md|slides|deck|json] [-o, --output FILE] [--name NAME]
+```
+
+Documentation for one audience at one depth, every statement linked to its line, ending with its provenance. Writes
+`<file>.manifest.json` with the file's sha256. Exit `2` for an unknown audience, detail or format; `1` if a link
+doesn't resolve. See [Documentation and explanations](../guides/documentation.md).
+
+## `dev explain`
+
+```text
+dev explain FOCUS [-w, --workspace DIR] [-l, --level LEVEL]... [-o, --output FILE] [--json]
+```
+
+One file or symbol (a path, a name, `path:name` or an id) explained at each level. Exit `2` when the name is unknown
+or used more than once (the message lists the candidates).
+
 ## `dev present`
 
 ```text

@@ -26,6 +26,8 @@ Dev Guru is on PyPI as [`dev-guru`](https://pypi.org/project/dev-guru/).
 | `dev explore` | The explorer report: constellation, flow, impact rings, calls, hotspots and a tour |
 | `dev present` | One offline, accessible HTML deck from Markdown slides |
 | `dev diagram` | An animated SVG of what a document states, every edge cited |
+| `dev explain` | One file or function explained at four levels, from newcomer to leader, every statement cited |
+| `dev docs` | Documentation for one audience and depth, with provenance and checked links |
 | `dev graph` | Part of the code graph as Mermaid or SVG: a focus, a depth and a budget, expandable a step at a time |
 | `dev sources` | Capabilities from your folders, private Git and Dex Trove |
 | `dev serve` | A local web interface: live runs, the code graph and your capabilities. See [The local gateway](guides/gateway.md) |

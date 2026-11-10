@@ -216,4 +216,47 @@ def graph_export(
         raise errors.GuruError(errors.INVALID_INPUT, str(exc)) from exc
 
 
-__all__ = ["ExploreResult", "explore", "explorer_model", "export_html", "graph_export"]
+def explanation(
+    workspace: Path,
+    focus: str,
+    *,
+    client: AnankeClient | None = None,
+    levels: tuple[str, ...] | None = None,
+) -> tuple[dict[str, Any], ExploreResult]:
+    """One file or symbol explained at each level of the ladder (``dev-guru/explanation@1``)."""
+    from dev_guru import explain as ladder
+
+    result = explore(workspace, client=client)
+    try:
+        return ladder.explain(result.model, focus, levels=levels or ladder.LEVELS), result
+    except ladder.ExplainError as exc:
+        raise errors.GuruError(errors.INVALID_INPUT, str(exc)) from exc
+
+
+def documentation(
+    workspace: Path,
+    *,
+    client: AnankeClient | None = None,
+    audience: str = "practitioner",
+    detail: str = "standard",
+    name: str | None = None,
+) -> tuple[dict[str, Any], ExploreResult]:
+    """Documentation for one audience at one depth (``dev-guru/documentation@1``)."""
+    from dev_guru.explain import docs
+
+    result = explore(workspace, client=client, name=name)
+    try:
+        return docs.build(result.model, result.manifest, audience=audience, detail=detail), result
+    except docs.DocsError as exc:
+        raise errors.GuruError(errors.INVALID_INPUT, str(exc)) from exc
+
+
+__all__ = [
+    "ExploreResult",
+    "documentation",
+    "explanation",
+    "explore",
+    "explorer_model",
+    "export_html",
+    "graph_export",
+]

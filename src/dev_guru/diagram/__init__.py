@@ -271,7 +271,7 @@ def render(model: dict[str, Any], *, animate: bool = True, title: str = "") -> s
             f'<text x="{x + nw / 2:.1f}" y="{y + nh / 2 + 5:.1f}">{html.escape(e["label"][:24])}</text></g>'
         )
     # a label moved down to stay clear of the others can end below the last node: make room for it
-    height = max(height, max(box[3] for box in taken) + pad)
+    height = max(height, round(max(box[3] for box in taken) + pad))
     anim = (
         ".edge path{stroke-dasharray:6 8;animation:flow 1.6s linear infinite;animation-delay:calc(var(--k)*-.2s)}"
         "@keyframes flow{to{stroke-dashoffset:-28}}"

@@ -46,6 +46,8 @@ Git revision. See [report safety](docs/concepts/report-safety.md).
 dev present talk.md                  # Markdown slides → one offline, accessible HTML deck
 dev diagram docs/arch.md             # an animated SVG of what a document states, every edge cited
 dev graph . --focus service.py       # Mermaid of the code around one file; -f svg for a drawing
+dev explain cart.py                  # one file from novice to executive, every statement cited
+dev docs . --audience principal      # documentation for architects, with provenance
 dev explore . --profile public       # a report safe to publish: no source, docstrings or Git revision
 dev sources                          # capabilities from your folders, private Git and Dex Trove
 dev serve                            # a local web interface: live runs, the code graph, your capabilities

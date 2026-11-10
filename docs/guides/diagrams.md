@@ -1,9 +1,9 @@
 ---
-title: Diagrams from documents
+title: Diagrams from documents and code
 description: Turn the relationships an approved document states into an animated SVG where every edge cites its file and line, and nothing is invented.
 ---
 
-# Diagrams from documents
+# Diagrams from documents and code
 
 `dev diagram` draws the relationships a document **states**, and every edge cites the line it came from:
 

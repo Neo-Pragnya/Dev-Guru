@@ -14,6 +14,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
   a depth and a node budget. Nodes with neighbours left out show `+N`, and the command that draws them is printed, so a
   diagram grows a step at a time. Imports and calls between two nodes share one edge; inferred calls are dashed. The
   SDK's `export()` takes the same formats.
+- **`dev explain`:** one file or symbol explained at four levels: novice, practitioner, principal and executive.
+  Every statement cites its file and line and says whether it was observed, derived or inferred. No language model:
+  the same code gives the same explanation.
+- **`dev docs`:** documentation for one audience at one depth (`brief`, `standard`, `deep`), as Markdown, slides,
+  an offline deck or JSON. Every link is checked before the file is kept, it ends with its provenance, and a manifest
+  with its sha256 is written next to it. Text from the code is escaped.
 - **Contract tests for the explorer view model:** it round-trips through the page, keeps its ids when unrelated
   files change, and every edge, snippet, hotspot and insight points at something real.
 
