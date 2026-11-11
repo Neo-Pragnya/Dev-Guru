@@ -683,6 +683,9 @@ def docs(
     generator: Annotated[
         str, typer.Option(help="Navigation for --site: mkdocs or astro")
     ] = "mkdocs",
+    force: Annotated[
+        bool, typer.Option("--force", help="With --site: overwrite pages edited by hand")
+    ] = False,
     output: Annotated[
         Path | None,
         typer.Option("--output", "-o", help="File to write (default dev-guru-<audience>.<ext>)"),
@@ -718,11 +721,20 @@ def docs(
                 generator=generator,
                 detail=detail,
                 evidence=evidence,
+                force=force,
             )
         except (errors.GuruError, writer.DocsError) as exc:
             typer.echo(f"error: {getattr(exc, 'message', exc)} ({errors.INVALID_INPUT})", err=True)
             raise typer.Exit(2) from exc
-        typer.echo(f"Wrote {len(done['pages'])} pages and {done['nav']} to {site_dir}")
+        typer.echo(
+            f"{site_dir}: {len(done['written'])} written, {len(done['unchanged'])} unchanged, "
+            f"{len(done['kept'])} kept because they were edited"
+        )
+        for name in done["kept"]:
+            stem = name.rsplit(".", 1)[0]
+            typer.echo(
+                f"  kept {name}: review {stem}.diff, then copy {stem}.proposed.* over it (or use --force)"
+            )
         return
     ext = {"md": "md", "obsidian": "md", "slides": "slides.md", "deck": "html", "json": "json"}
     if fmt not in ext:
