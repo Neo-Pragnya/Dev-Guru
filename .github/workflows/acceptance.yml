@@ -89,4 +89,7 @@ jobs:
 
       - name: Record what was tested
         if: always()
-        run: .acceptance-venv/bin/python -c "import importlib.metadata as m; print({p: (m.version(p) if p in {d.metadata['Name'].lower() for d in m.distributions()} else None) for p in ('dev-guru', 'ananke-plexus', 'dex-trove', 'pydantic')})" >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          .acceptance-venv/bin/python -m pip list --format=freeze 2>/dev/null \
+            | grep -iE '^(dev-guru|ananke-plexus|dex-trove|pydantic)==' >> "$GITHUB_STEP_SUMMARY" || true
+          .acceptance-venv/bin/python -c 'import importlib.metadata as m; [print(p, m.version(p)) for p in ("dev-guru", "ananke-plexus", "pydantic")]' >> "$GITHUB_STEP_SUMMARY"
