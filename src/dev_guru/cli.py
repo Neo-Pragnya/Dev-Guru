@@ -326,6 +326,111 @@ def spec_new(
     typer.echo(f"Wrote {out}. Fill in the requirements, then run: dev spec trace {out}")
 
 
+@spec_app.command("plan")
+def spec_plan(
+    spec: Annotated[Path, typer.Argument(help="A spec with requirement ids")],
+    workspace: Annotated[Path, typer.Option("--workspace", "-w", help="Project")] = Path("."),
+    transport: TransportOpt = "in-process",
+    as_json: JsonOpt = False,
+) -> None:
+    """A test-first plan: each requirement's kind (behaviour, state, invariant, interface, security, performance), its
+    risk, the tests that fit it, and the tasks in dependency order ("after R1" makes R1 come first)."""
+    from dev_guru.spec import plan as planning
+
+    try:
+        tr, result = service.spec_context(spec, workspace, client=connect(transport))
+    except errors.GuruError as exc:
+        typer.echo(f"error: {exc.message} ({exc.code})", err=True)
+        raise typer.Exit(2) from exc
+    p = planning.plan(tr, result.model)
+    typer.echo(
+        json.dumps(p, indent=2, ensure_ascii=False) if as_json else planning.plan_markdown(p)
+    )
+
+
+@spec_app.command("tests")
+def spec_tests(
+    spec: Annotated[Path, typer.Argument(help="A spec with requirement ids")],
+    out_dir: Annotated[Path, typer.Option("--out", help="Where to write the tests")] = Path(
+        "tests/spec"
+    ),
+    style: Annotated[str, typer.Option(help="pytest or gherkin")] = "pytest",
+    workspace: Annotated[Path, typer.Option("--workspace", "-w", help="Project")] = Path("."),
+    transport: TransportOpt = "in-process",
+) -> None:
+    """Failing tests for each requirement that has none, written before the code and named after its id. Existing
+    files are never overwritten."""
+    from dev_guru.spec import plan as planning
+
+    if style not in ("pytest", "gherkin"):
+        typer.echo(
+            f"error: unknown style {style!r}; choose pytest or gherkin ({errors.INVALID_INPUT})",
+            err=True,
+        )
+        raise typer.Exit(2)
+    try:
+        tr, result = service.spec_context(spec, workspace, client=connect(transport))
+    except errors.GuruError as exc:
+        typer.echo(f"error: {exc.message} ({exc.code})", err=True)
+        raise typer.Exit(2) from exc
+    written = planning.skeletons(planning.plan(tr, result.model), out_dir, style=style)
+    for path in written:
+        typer.echo(f"wrote {path}")
+    typer.echo(f"{len(written)} failing test file(s); they pass once the requirements are met")
+
+
+@spec_app.command("verify")
+def spec_verify(
+    spec: Annotated[Path, typer.Argument(help="A spec with requirement ids")],
+    workspace: Annotated[Path, typer.Option("--workspace", "-w", help="Project")] = Path("."),
+    transport: TransportOpt = "in-process",
+    as_json: JsonOpt = False,
+) -> None:
+    """Run the tests that name each requirement (pytest) and say which requirements are done: linked to code, with
+    tests, and passing. Runs the project's own tests; the result is kept in the Ananke run. Exits 1 if any isn't."""
+    from dev_guru.spec import plan as planning
+
+    client = connect(transport)
+    try:
+        tr, result = service.spec_context(spec, workspace, client=client)
+    except errors.GuruError as exc:
+        typer.echo(f"error: {exc.message} ({exc.code})", err=True)
+        raise typer.Exit(2) from exc
+    out = planning.verify(tr, result.workspace)
+    service.record(result, "spec-verify.json", out, client=client)
+    if as_json:
+        typer.echo(json.dumps(out, indent=2))
+    else:
+        for r in out["requirements"]:
+            typer.echo(f"{'done' if r['done'] else 'open':5} {r['id']}: {r['why']}")
+        typer.echo(f"{out['done']} of {out['total']} done")
+    if out["done"] < out["total"]:
+        raise typer.Exit(1)
+
+
+@spec_app.command("lock")
+def spec_lock(
+    spec: Annotated[Path, typer.Argument(help="A spec with requirement ids")],
+    workspace: Annotated[Path, typer.Option("--workspace", "-w", help="Project")] = Path("."),
+    transport: TransportOpt = "in-process",
+) -> None:
+    """Lock the spec before building: its requirements and the digest of each file they name. `dev spec trace
+    --check-lock` then shows what changed on either side."""
+    from dev_guru.spec import plan as planning
+
+    try:
+        tr, result = service.spec_context(spec, workspace, client=connect(transport))
+    except errors.GuruError as exc:
+        typer.echo(f"error: {exc.message} ({exc.code})", err=True)
+        raise typer.Exit(2) from exc
+    target = spec.with_name(spec.name + ".lock.json")
+    locked = planning.lock(tr, result.workspace)
+    target.write_text(json.dumps(locked, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    typer.echo(
+        f"wrote {target}: {len(locked['requirements'])} requirements, {len(locked['code'])} files"
+    )
+
+
 @spec_app.command("trace")
 def spec_trace(
     spec: Annotated[Path, typer.Argument(help="A spec with requirement ids (R1, REQ-2, ...)")],
@@ -341,6 +446,10 @@ def spec_trace(
     ] = None,
     transport: TransportOpt = "in-process",
     as_json: JsonOpt = False,
+    check_lock: Annotated[
+        bool,
+        typer.Option("--check-lock", help="Compare with the spec's .lock.json; exit 1 on drift"),
+    ] = False,
 ) -> None:
     """Each requirement traced to the code: linked (it names the code), possible (inferred from its words) or
     unlinked, and whether a test mentions its id. The trace is recorded in the Ananke run that read the code."""
@@ -351,15 +460,42 @@ def spec_trace(
     except errors.GuruError as exc:
         typer.echo(f"error: {exc.message} ({exc.code})", err=True)
         raise typer.Exit(2) from exc
+    drift = None
+    if check_lock:
+        from dev_guru.spec import plan as planning
+
+        lock_file = spec.with_name(spec.name + ".lock.json")
+        try:
+            locked = json.loads(lock_file.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            typer.echo(
+                f"error: no lock at {lock_file}; run dev spec lock ({errors.INVALID_INPUT})",
+                err=True,
+            )
+            raise typer.Exit(2) from exc
+        drift = planning.drift(locked, tr, workspace.expanduser().resolve())
+        tr["drift"] = drift
     if as_json:
         typer.echo(json.dumps(tr, indent=2, ensure_ascii=False))
-        return
-    text = specs.trace_markdown(tr)
-    if output:
-        output.write_text(text, encoding="utf-8")
-        typer.echo(f"Wrote {output}", err=True)
     else:
-        typer.echo(text)
+        text = specs.trace_markdown(tr)
+        if drift is not None:
+            text += "\n## Drift since the lock\n\n" + (
+                "No drift.\n"
+                if drift["clean"]
+                else "".join(
+                    f"- {k.replace('_', ' ')}: {', '.join(v)}\n"
+                    for k, v in drift.items()
+                    if k != "clean" and v
+                )
+            )
+        if output:
+            output.write_text(text, encoding="utf-8")
+            typer.echo(f"Wrote {output}", err=True)
+        else:
+            typer.echo(text)
+    if drift is not None and not drift["clean"]:
+        raise typer.Exit(1)
 
 
 @learning_app.command("review")

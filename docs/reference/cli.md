@@ -97,7 +97,11 @@ or `--min-repeats` below 2.
 
 ```text
 dev spec new NAME [--idea TEXT] [-o, --output FILE]
-dev spec trace SPEC.md [-w, --workspace DIR] [--level LEVEL] [-o, --output FILE] [--json]
+dev spec trace SPEC.md [-w, --workspace DIR] [--level LEVEL] [--check-lock] [-o, --output FILE] [--json]
+dev spec plan SPEC.md [--json]
+dev spec tests SPEC.md [--out DIR] [--style pytest|gherkin]
+dev spec verify SPEC.md [--json]
+dev spec lock SPEC.md
 ```
 
 A spec template from an idea (never overwrites), and each requirement traced to the code (linked, possible or
