@@ -48,6 +48,7 @@ dev diagram docs/arch.md             # an animated SVG of what a document states
 dev graph . --focus service.py       # Mermaid of the code around one file; -f svg for a drawing
 dev explain cart.py                  # one file from novice to executive, every statement cited
 dev docs . --audience principal      # documentation for architects, with provenance
+dev mentor                           # advice only on failures that repeat across Ananke runs
 dev explore . --profile public       # a report safe to publish: no source, docstrings or Git revision
 dev sources                          # capabilities from your folders, private Git and Dex Trove
 dev serve                            # a local web interface: live runs, the code graph, your capabilities

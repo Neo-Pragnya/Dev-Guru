@@ -251,6 +251,50 @@ def documentation(
         raise errors.GuruError(errors.INVALID_INPUT, str(exc)) from exc
 
 
+def _candidates(client: AnankeClient, root: Path) -> list[dict[str, Any]]:
+    return [
+        client.learning_candidate(root, n).model_dump() for n in client.learning_candidates(root)
+    ]
+
+
+def mentor_feedback(
+    workspace: Path,
+    *,
+    client: AnankeClient | None = None,
+    level: str = "practitioner",
+    min_repeats: int = 2,
+) -> dict[str, Any]:
+    """Advice on failures that repeat across this workspace's Ananke runs (``dev-guru/mentor-feedback@1``)."""
+    from dev_guru import mentor
+
+    client = client or connect()
+    root = workspace.expanduser().resolve()
+    runs = client.run_history(root).get("runs", [])
+    try:
+        return mentor.feedback(
+            runs, _candidates(client, root), level=level, min_repeats=min_repeats
+        )
+    except ValueError as exc:
+        raise errors.GuruError(errors.INVALID_INPUT, str(exc)) from exc
+
+
+def learning_map(workspace: Path, *, client: AnankeClient | None = None) -> dict[str, Any]:
+    """The learning candidates, the runs they came from and the files they mention (``dev-guru/learning-graph@1``)."""
+    from dev_guru import mentor
+
+    client = client or connect()
+    root = workspace.expanduser().resolve()
+    files = []
+    for path in root.rglob("*"):
+        rel = path.relative_to(root)
+        if any(part.startswith(".") for part in rel.parts) or not path.is_file():
+            continue
+        files.append(rel.as_posix())
+        if len(files) >= 20_000:
+            break
+    return mentor.learning_graph(_candidates(client, root), files=files)
+
+
 __all__ = [
     "ExploreResult",
     "documentation",
@@ -259,4 +303,6 @@ __all__ = [
     "explorer_model",
     "export_html",
     "graph_export",
+    "learning_map",
+    "mentor_feedback",
 ]

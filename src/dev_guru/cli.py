@@ -331,6 +331,45 @@ def learning_review(
         webbrowser.open(out.resolve().as_uri())
 
 
+@learning_app.command("graph")
+def learning_graph(
+    workspace: Annotated[Path, typer.Option("--workspace", "-w")] = Path("."),
+    fmt: Annotated[str, typer.Option("--format", "-f", help="mermaid or json")] = "mermaid",
+    output: Annotated[
+        Path | None, typer.Option("--output", "-o", help="Write here instead of printing")
+    ] = None,
+    transport: TransportOpt = "in-process",
+) -> None:
+    """A map of what has been learned: each lesson, the runs it came from, the files it mentions, and the terms
+    lessons share. It only reads; promote a reviewed lesson with `ananke learning promote`."""
+    from dev_guru import mentor
+
+    if fmt not in ("mermaid", "json"):
+        typer.echo(
+            f"error: unknown format {fmt!r}; choose mermaid or json ({errors.INVALID_INPUT})",
+            err=True,
+        )
+        raise typer.Exit(2)
+    try:
+        graph = service.learning_map(workspace, client=connect(transport))
+    except errors.GuruError as exc:
+        typer.echo(f"error: {exc.message} ({exc.code})", err=True)
+        raise typer.Exit(2) from exc
+    text = (
+        json.dumps(graph, indent=2, ensure_ascii=False) + "\n"
+        if fmt == "json"
+        else mentor.graph_mermaid(graph)
+    )
+    if output:
+        output.write_text(text, encoding="utf-8")
+        typer.echo(
+            f"Wrote {output}: {graph['lessons']} lessons, {len(graph['patterns'])} shared terms",
+            err=True,
+        )
+    else:
+        typer.echo(text, nl=False)
+
+
 @app.command()
 def serve(
     workspaces: Annotated[
@@ -456,6 +495,46 @@ def bpmn(
         typer.echo(f"problem: {problem}", err=True)
     if model["problems"]:
         raise typer.Exit(1)
+
+
+@app.command()
+def mentor(
+    workspace: Annotated[Path, typer.Argument(help="Project whose Ananke runs to read")] = Path(
+        "."
+    ),
+    level: Annotated[
+        str, typer.Option(help="novice, practitioner, principal or executive")
+    ] = "practitioner",
+    min_repeats: Annotated[
+        int,
+        typer.Option(help="Advise only on failures seen in at least this many runs (2 or more)"),
+    ] = 2,
+    output: Annotated[
+        Path | None, typer.Option("--output", "-o", help="Write Markdown here")
+    ] = None,
+    transport: TransportOpt = "in-process",
+    as_json: JsonOpt = False,
+) -> None:
+    """Advice from evidence: failures that repeat across this workspace's Ananke runs, what they mean, and any
+    reviewed lesson on the same thing. Nothing is a judgement of style, and a failure seen once gets no advice."""
+    from dev_guru import mentor as mentoring
+
+    try:
+        fb = service.mentor_feedback(
+            workspace, client=connect(transport), level=level, min_repeats=min_repeats
+        )
+    except errors.GuruError as exc:
+        typer.echo(f"error: {exc.message} ({exc.code})", err=True)
+        raise typer.Exit(2) from exc
+    if as_json:
+        typer.echo(json.dumps(fb, indent=2, ensure_ascii=False))
+        return
+    text = mentoring.feedback_markdown(fb)
+    if output:
+        output.write_text(text, encoding="utf-8")
+        typer.echo(f"Wrote {output}: {len(fb['advice'])} pieces of advice", err=True)
+    else:
+        typer.echo(text)
 
 
 @app.command()

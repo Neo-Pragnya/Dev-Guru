@@ -75,6 +75,24 @@ Writes a review page for a learning candidate: what still blocks promotion, the 
 review decision, provenance, and a diff against each destination. Reviewing changes nothing. Approve with
 `ananke learning review --approve`, then promote with `ananke learning promote`.
 
+## `dev learning graph`
+
+```text
+dev learning graph [-w, --workspace DIR] [-f, --format mermaid|json] [-o, --output FILE]
+```
+
+Lessons, the runs they came from, the files they mention and the terms they share. Read-only. See
+[Mentoring from evidence](../guides/mentoring.md).
+
+## `dev mentor`
+
+```text
+dev mentor [WORKSPACE] [--level novice|practitioner|principal|executive] [--min-repeats N] [-o FILE] [--json]
+```
+
+Advice on failures repeated across this workspace's Ananke runs, each naming its runs. Exit `2` for an unknown level
+or `--min-repeats` below 2.
+
 ## `dev serve`
 
 ```bash
