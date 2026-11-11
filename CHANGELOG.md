@@ -10,6 +10,25 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
 
 ---
 
+## [0.13.0] — 2026-11-10
+
+### Added
+
+- **`dev review`:** a change against a base, from Git, Ananke's code graph and the project's reports: the changed
+  functions and their callers, the files reached through imports, blocking items (findings Ananke ranks *fix now*,
+  requirements whose code changed with no test naming them) apart from advisory ones, the tests to rerun, and with
+  `--pr-body` a draft pull request description. Exit 1 when something blocks.
+- **`dev docs --site DIR --generator mkdocs|astro`:** a page per reader, an index and the navigation, links checked.
+  **`-f obsidian`** writes `[[path|path:line]]` links for a vault at the project root.
+- **Maps and evidence in documents:** a Mermaid map of the folders on the developer and architecture pages, and the
+  repository's ranked findings with the gates to rerun.
+
+### Changed
+
+- **Needs Ananke 0.3.36 or later,** for `prioritized_findings` and `contract_gaps` on its app facade.
+
+---
+
 ## [0.12.0] — 2026-11-10
 
 ### Added

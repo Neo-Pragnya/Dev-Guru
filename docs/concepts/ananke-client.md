@@ -55,5 +55,5 @@ Every pull request runs the full acceptance suite on the built wheel four times:
 | the newest on PyPI | installed | Dex |
 
 So the declared range is the tested range, and Dev Guru works the same with or without Dex. Locally:
-`make acceptance-wheel ACCEPTANCE_PINS="ananke-plexus==0.3.33 dex-trove"`.
+`make acceptance-wheel ACCEPTANCE_PINS="ananke-plexus==0.3.36 dex-trove"`.
 

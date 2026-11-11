@@ -566,6 +566,60 @@ def bpmn(
 
 
 @app.command()
+def review(
+    workspace: Annotated[Path, typer.Argument(help="Project with the change")] = Path("."),
+    base: Annotated[
+        str, typer.Option(help="Compare with this Git ref (branch, tag or commit)")
+    ] = "main",
+    spec: Annotated[
+        Path | None,
+        typer.Option(
+            help="A spec with requirement ids, to check the requirements the change touches"
+        ),
+    ] = None,
+    pr_body: Annotated[
+        Path | None,
+        typer.Option("--pr-body", help="Also write a draft pull request description here"),
+    ] = None,
+    output: Annotated[
+        Path | None, typer.Option("--output", "-o", help="Write the review here")
+    ] = None,
+    transport: TransportOpt = "in-process",
+    as_json: JsonOpt = False,
+) -> None:
+    """Review a change: what changed and what it reaches, what blocks it and what's advisory, what to retest, and a
+    draft pull request description. Exits 1 when something blocks it."""
+    from dev_guru import review as reviewing
+
+    try:
+        rv, result = service.code_review(workspace, base, client=connect(transport), spec=spec)
+    except errors.GuruError as exc:
+        typer.echo(f"error: {exc.message} ({exc.code})", err=True)
+        raise typer.Exit(2) from exc
+    text = (
+        json.dumps(rv, indent=2, ensure_ascii=False) + "\n"
+        if as_json
+        else reviewing.to_markdown(rv)
+    )
+    if output:
+        output.write_text(text, encoding="utf-8")
+        typer.echo(f"Wrote {output}", err=True)
+    else:
+        typer.echo(text, nl=False)
+    if pr_body:
+        ws = result.manifest.get("workspace", {})
+        pr_body.write_text(
+            reviewing.pr_body(
+                rv, revision=ws.get("commit"), digest=result.manifest.get("input_digest")
+            ),
+            encoding="utf-8",
+        )
+        typer.echo(f"Wrote {pr_body}", err=True)
+    if rv["blocking"]:
+        raise typer.Exit(1)
+
+
+@app.command()
 def mentor(
     workspace: Annotated[Path, typer.Argument(help="Project whose Ananke runs to read")] = Path(
         "."
@@ -615,9 +669,20 @@ def docs(
     fmt: Annotated[
         str,
         typer.Option(
-            "--format", "-f", help="md, slides (Markdown for dev present), deck (HTML) or json"
+            "--format",
+            "-f",
+            help="md, obsidian (wikilinks), slides (Markdown for dev present), deck (HTML) or json",
         ),
     ] = "md",
+    site_dir: Annotated[
+        Path | None,
+        typer.Option(
+            "--site", help="Write a page per audience, an index and the site navigation here"
+        ),
+    ] = None,
+    generator: Annotated[
+        str, typer.Option(help="Navigation for --site: mkdocs or astro")
+    ] = "mkdocs",
     output: Annotated[
         Path | None,
         typer.Option("--output", "-o", help="File to write (default dev-guru-<audience>.<ext>)"),
@@ -635,7 +700,31 @@ def docs(
     from dev_guru import present as deck
     from dev_guru.explain import docs as writer
 
-    ext = {"md": "md", "slides": "slides.md", "deck": "html", "json": "json"}
+    if site_dir is not None:
+        try:
+            _doc, result = service.documentation(
+                workspace,
+                client=connect(transport),
+                audience="practitioner",
+                detail=detail,
+                name=name,
+            )
+            evidence = connect(transport).prioritized_findings(result.workspace, [])
+            done = writer.site(
+                result.model,
+                result.manifest,
+                root=result.workspace,
+                out_dir=site_dir.resolve(),
+                generator=generator,
+                detail=detail,
+                evidence=evidence,
+            )
+        except (errors.GuruError, writer.DocsError) as exc:
+            typer.echo(f"error: {getattr(exc, 'message', exc)} ({errors.INVALID_INPUT})", err=True)
+            raise typer.Exit(2) from exc
+        typer.echo(f"Wrote {len(done['pages'])} pages and {done['nav']} to {site_dir}")
+        return
+    ext = {"md": "md", "obsidian": "md", "slides": "slides.md", "deck": "html", "json": "json"}
     if fmt not in ext:
         typer.echo(
             f"error: unknown format {fmt!r}; choose {', '.join(ext)} ({errors.INVALID_INPUT})",
@@ -653,6 +742,14 @@ def docs(
     out.parent.mkdir(parents=True, exist_ok=True)
     if fmt == "json":
         text = json.dumps(doc, indent=2, ensure_ascii=False) + "\n"
+    elif fmt == "obsidian":  # the project is the vault: links name files by their path in it
+        text = writer.to_markdown(
+            doc, root=result.workspace, out_dir=out.parent.resolve(), wikilinks=True
+        )
+        broken = writer.check_wikilinks(text, result.workspace)
+        if broken:
+            typer.echo("error: broken links: " + "; ".join(broken[:5]), err=True)
+            raise typer.Exit(1)
     elif fmt == "md":
         text = writer.to_markdown(doc, root=result.workspace, out_dir=out.parent.resolve())
         broken = writer.check_links(text, out.parent.resolve())

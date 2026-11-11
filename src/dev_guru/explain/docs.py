@@ -11,6 +11,7 @@ add links, HTML or table cells.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 from pathlib import Path
@@ -363,12 +364,73 @@ def _start(facts: Facts, limit: int, *, plain: bool) -> dict[str, Any]:
     return section
 
 
+def _map(facts: Facts, n: int) -> dict[str, Any]:
+    """How the folders depend on each other, as a Mermaid diagram, with a file in each folder to start from."""
+    from dev_guru.reports import subgraph
+
+    sub = subgraph.select(facts.model, level="package", budget=max(6, min(40, n * 2)))
+    rows = []
+    for node in sub["nodes"]:
+        pkg = next(
+            (p for p in facts.model.get("packages", []) if "package:" + p["name"] == node["id"]),
+            None,
+        )
+        first = facts.path(sorted(pkg["files"])[0]) if pkg and pkg["files"] else ""
+        rows.append(
+            (
+                [f"`{node['label']}`", str(len(pkg["files"]) if pkg else 0)],
+                [(first, 1)] if first else [],
+            )
+        )
+    section = _section(
+        "map",
+        "Map",
+        [
+            _say(
+                "Folders and the imports between them, from the code graph; dashed arrows are inferred calls.",
+                "derived",
+            )
+        ],
+        _table(["Folder", "Files"], rows),
+    )
+    section["mermaid"] = subgraph.to_mermaid(sub)
+    return section
+
+
+def _evidence(facts: Facts, evidence: dict[str, Any], n: int) -> dict[str, Any]:
+    """What the repository's own reports say (scanners, tests, coverage, dependencies), as Ananke ranked it."""
+    counts = evidence.get("counts") or {}
+    out = [
+        _say(
+            f"{counts.get('fix now', 0)} finding(s) to fix now, {counts.get('fix soon', 0)} soon and "
+            f"{counts.get('later', 0)} later, from the SARIF, JUnit, coverage and dependency reports in the repository.",
+            "derived",
+        )
+    ]
+    known = {f["path"] for f in facts.files.values()}
+    for f in (evidence.get("findings") or [])[: min(n, 8)]:
+        where = (f.get("path"), int(f.get("line") or 1)) if f.get("path") in known else ("", 0)
+        what = f.get("message") or f.get("rule") or f.get("kind")
+        out.append(_say(f"{f['tier']}: {f['kind']} ({f['severity']}): {what}", "observed", where))
+    for gate in (evidence.get("rerun") or [])[:4]:
+        out.append(_say(f"To confirm a fix, rerun {gate['gate']}: `{gate['command']}`", "derived"))
+    if not evidence.get("findings"):
+        out.append(
+            _say(
+                "No findings in the reports. With no report, that means unknown, not zero.",
+                "derived",
+            )
+        )
+    return _section("evidence", "Evidence from the repository's reports", out)
+
+
 def build(
     model: dict[str, Any],
     manifest: dict[str, Any],
     *,
     audience: str = "practitioner",
     detail: str = "standard",
+    evidence: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if audience not in LEVELS:
         raise DocsError(f"unknown audience {audience!r}; choose {', '.join(LEVELS)}")
@@ -381,6 +443,7 @@ def build(
         sections += [_risks(facts, min(n, 5))]
     elif audience == "principal":
         sections += [
+            _map(facts, n),
             _packages(facts, n),
             _central(facts, n),
             _risks(facts, n),
@@ -389,6 +452,7 @@ def build(
         ]
     elif audience == "practitioner":
         sections += [
+            _map(facts, n),
             _start(facts, n, plain=False),
             *_files(facts, n, detail == "deep"),
             *_interfaces(facts, n),
@@ -412,6 +476,8 @@ def build(
                     _file_ladder(facts, fid)["novice"],
                 )
             )
+    if evidence is not None and audience in ("principal", "executive", "practitioner"):
+        sections.append(_evidence(facts, evidence, n))
     sections.append(_limitations(facts))
     ws = manifest.get("workspace", {})
     return {
@@ -455,14 +521,22 @@ def _plain(text: str, cell: bool) -> str:
     return text.replace("|", "\\|") if cell else text
 
 
-def _link(ev: dict[str, Any], root: Path, out_dir: Path) -> str:
+def _wikilink(ev: dict[str, Any]) -> str:
+    """Obsidian: a link to the file by its path in the vault (the project), labelled with the line."""
+    label = ev["path"] + (f":{ev['line']}" if ev["line"] else "")
+    return f"[[{ev['path']}|{label}]]"
+
+
+def _link(ev: dict[str, Any], root: Path, out_dir: Path, wikilinks: bool = False) -> str:
+    if wikilinks:
+        return _wikilink(ev)
     target = os.path.relpath(root / ev["path"], out_dir).replace(os.sep, "/")
     label = ev["path"] + (f":{ev['line']}" if ev["line"] else "")
     anchor = f"#L{ev['line']}" if ev["line"] else ""
     return f"[{label}]({target}{anchor})"
 
 
-def to_markdown(doc: dict[str, Any], *, root: Path, out_dir: Path) -> str:
+def to_markdown(doc: dict[str, Any], *, root: Path, out_dir: Path, wikilinks: bool = False) -> str:
     who = {
         "novice": "someone new to the code",
         "practitioner": "developers working on it",
@@ -489,12 +563,14 @@ def to_markdown(doc: dict[str, Any], *, root: Path, out_dir: Path) -> str:
         if sec.get("lead"):
             lines += [escape(sec["lead"]), ""]
         for i, st in enumerate(sec["statements"], start=1):
-            refs = ", ".join(_link(ev, root, out_dir) for ev in st["evidence"][:4])
+            refs = ", ".join(_link(ev, root, out_dir, wikilinks) for ev in st["evidence"][:4])
             tag = " *(inferred)*" if st["basis"] == "inferred" else ""
             bullet = f"{i}." if sec.get("ordered") else "-"
             lines.append(f"{bullet} {escape(st['text'])}{tag}" + (f" ({refs})" if refs else ""))
         if sec["statements"]:
             lines.append("")
+        if sec.get("mermaid"):
+            lines += ["```mermaid", sec["mermaid"].rstrip("\n"), "```", ""]
         table = sec.get("table")
         if table and table["rows"]:
             cols = table["columns"] + (
@@ -505,7 +581,8 @@ def to_markdown(doc: dict[str, Any], *, root: Path, out_dir: Path) -> str:
                 cells = [escape(c, cell=True) for c in row["cells"]]
                 if len(cols) > len(row["cells"]):
                     cells.append(
-                        ", ".join(_link(ev, root, out_dir) for ev in row["evidence"][:2]) or "—"
+                        ", ".join(_link(ev, root, out_dir, wikilinks) for ev in row["evidence"][:2])
+                        or "—"
                     )
                 lines.append("| " + " | ".join(cells) + " |")
             lines.append("")
@@ -550,6 +627,78 @@ def explanation_markdown(exp: dict[str, Any], *, root: Path, out_dir: Path) -> s
 
 
 _MD_LINK = re.compile(r"(?<!\\)\]\(([^)\s]+)\)")  # an escaped \] is text, not a link
+
+
+_WIKI = re.compile(r"\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|[^\]]*)?\]\]")
+
+
+def check_wikilinks(markdown: str, vault: Path) -> list[str]:
+    """Obsidian links that don't name a file in the vault (empty when every one does)."""
+    return [
+        f"[[{t}]]: no such file in the vault"
+        for t in _WIKI.findall(markdown)
+        if not (vault / t).is_file()
+    ]
+
+
+GENERATORS = ("mkdocs", "astro")
+
+
+def site(
+    model: dict[str, Any],
+    manifest: dict[str, Any],
+    *,
+    root: Path,
+    out_dir: Path,
+    generator: str = "mkdocs",
+    detail: str = "standard",
+    evidence: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """A page per audience, an index, and the navigation for MkDocs or Astro. Every link is checked first."""
+    if generator not in GENERATORS:
+        raise DocsError(f"unknown generator {generator!r}; choose {', '.join(GENERATORS)}")
+    titles = {
+        "novice": "Start here",
+        "practitioner": "Developer guide",
+        "principal": "Architecture",
+        "executive": "Overview for leaders",
+    }
+    pages: dict[str, str] = {}
+    for audience in LEVELS:
+        doc = build(model, manifest, audience=audience, detail=detail, evidence=evidence)
+        pages[f"{audience}.md"] = to_markdown(doc, root=root, out_dir=out_dir)
+    project = escape(str(model["project"]["name"]))
+    index = [f"# {project}", "", "Documentation written from the code, for four readers:", ""]
+    index += [f"- [{titles[a]}]({a}.md): for {a}s" for a in LEVELS]
+    pages["index.md"] = "\n".join(index) + "\n"
+    problems = []
+    for name, text in pages.items():  # a link to another page being written counts as resolved
+        problems += [
+            f"{name}: {x}" for x in check_links(text, out_dir) if x.split(":", 1)[0] not in pages
+        ]
+    if problems:
+        raise DocsError("broken links: " + "; ".join(problems[:5]))
+    order = ["index.md", *(f"{a}.md" for a in LEVELS)]
+    nav = [{"Home" if n == "index.md" else titles[n[:-3]]: n} for n in order]
+    if generator == "mkdocs":
+        nav_file = "mkdocs-nav.yml"
+        nav_text = "nav:\n" + "".join(
+            f"  - {next(iter(item))}: {next(iter(item.values()))}\n" for item in nav
+        )
+    else:
+        nav_file = "astro-sidebar.json"
+        nav_text = (
+            json.dumps(
+                [{"label": next(iter(i)), "link": next(iter(i.values()))[:-3]} for i in nav],
+                indent=2,
+            )
+            + "\n"
+        )
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for name, text in pages.items():
+        (out_dir / name).write_text(text, encoding="utf-8")
+    (out_dir / nav_file).write_text(nav_text, encoding="utf-8")
+    return {"pages": order, "nav": nav_file, "generator": generator}
 
 
 def check_links(markdown: str, out_dir: Path) -> list[str]:
@@ -616,12 +765,15 @@ def to_slides(doc: dict[str, Any]) -> str:
 
 __all__ = [
     "DETAILS",
+    "GENERATORS",
     "SCHEMA",
     "DocsError",
     "build",
     "check_links",
+    "check_wikilinks",
     "escape",
     "explanation_markdown",
+    "site",
     "to_markdown",
     "to_slides",
 ]
