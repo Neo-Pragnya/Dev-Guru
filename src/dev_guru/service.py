@@ -244,9 +244,14 @@ def documentation(
     """Documentation for one audience at one depth (``dev-guru/documentation@1``)."""
     from dev_guru.explain import docs
 
+    client = client or connect()
     result = explore(workspace, client=client, name=name)
+    evidence = client.prioritized_findings(result.workspace, [])
     try:
-        return docs.build(result.model, result.manifest, audience=audience, detail=detail), result
+        doc = docs.build(
+            result.model, result.manifest, audience=audience, detail=detail, evidence=evidence
+        )
+        return doc, result
     except docs.DocsError as exc:
         raise errors.GuruError(errors.INVALID_INPUT, str(exc)) from exc
 
@@ -331,8 +336,39 @@ def spec_trace(
     return tr
 
 
+def code_review(
+    workspace: Path,
+    base: str,
+    *,
+    client: AnankeClient | None = None,
+    spec: Path | None = None,
+) -> tuple[dict[str, Any], ExploreResult]:
+    """A change against ``base``: what changed and reaches, blocking and advisory items, and what to retest."""
+    from dev_guru import review as reviewing
+    from dev_guru import spec as specs
+
+    client = client or connect()
+    root = workspace.expanduser().resolve()
+    try:
+        change = reviewing.changes(root, base)
+    except reviewing.ReviewError as exc:
+        raise errors.GuruError(errors.INVALID_INPUT, str(exc)) from exc
+    result = explore(root, client=client)
+    findings = client.prioritized_findings(root, change["files"])
+    trace = None
+    if spec is not None:
+        try:
+            trace = specs.trace(
+                spec.read_text(encoding="utf-8"), spec.name, result.model, result.workspace
+            )
+        except (OSError, UnicodeDecodeError, specs.SpecError) as exc:
+            raise errors.GuruError(errors.INVALID_INPUT, f"{spec}: {exc}") from exc
+    return reviewing.review(result.model, change, findings, trace), result
+
+
 __all__ = [
     "ExploreResult",
+    "code_review",
     "documentation",
     "explanation",
     "explore",

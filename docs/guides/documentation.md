@@ -54,6 +54,25 @@ on a docs site. Before a file is kept, every link is checked; a broken one is an
 
 Text from the code (docstrings, names, signatures) is escaped, so a docstring can't add a link, HTML or a table cell.
 
+## Maps and evidence
+
+The developer and architecture pages start with a **map**: a Mermaid diagram of the folders and the imports between
+them, from the code graph, with a file in each folder to start from. The architecture, developer and leader pages end
+with **evidence from the repository's reports**: what Ananke ranks *fix now*, *fix soon* and *later* from the SARIF,
+JUnit, coverage and dependency reports, each linked to its line, and the gates to rerun.
+
+## Obsidian, MkDocs and Astro
+
+```bash
+dev docs . -f obsidian -o notes/architecture.md     # [[path|path:line]] links, for a vault at the project root
+dev docs . --site docs/generated --generator mkdocs # a page per reader, an index, and mkdocs-nav.yml
+dev docs . --site src/content/docs/code --generator astro   # the same with astro-sidebar.json
+```
+
+A site has `index.md`, `novice.md`, `practitioner.md`, `principal.md` and `executive.md`, and the navigation to paste
+into `mkdocs.yml` or the Astro sidebar. Every link is checked before anything is written; Obsidian links must name a
+file in the vault.
+
 ## Limits
 
 - Python is analysed in full; other languages contribute what the repository analysis finds (routes, tables,

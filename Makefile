@@ -63,7 +63,7 @@ acceptance-wheel: build
 	$(MAKE) acceptance-dist
 
 # Against an already-built dist/*.whl (CI tests the exact artifact it publishes). ACCEPTANCE_PINS adds or pins
-# packages in the same environment, e.g. ACCEPTANCE_PINS="ananke-plexus==0.3.33 dex-trove" (the compatibility matrix).
+# packages in the same environment, e.g. ACCEPTANCE_PINS="ananke-plexus==0.3.36 dex-trove" (the compatibility matrix).
 acceptance-dist:
 	rm -rf $(ACCEPTANCE_VENV)
 	$(UV) venv -q --python 3.12 $(ACCEPTANCE_VENV)

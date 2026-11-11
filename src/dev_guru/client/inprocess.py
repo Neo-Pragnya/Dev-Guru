@@ -161,6 +161,14 @@ class InProcessAnanke:
     def run_history(self, workspace: Path) -> dict[str, Any]:
         return dict(self._call(workspace, lambda f: f.evidence_view()))
 
+    def prioritized_findings(self, workspace: Path, changed: list[str]) -> dict[str, Any]:
+        """Ananke 0.3.36+: what to fix first, ranked against ``changed``."""
+        return dict(self._call(workspace, lambda f: f.prioritized_findings(list(changed))))
+
+    def contract_gaps(self, workspace: Path) -> dict[str, Any]:
+        """Ananke 0.3.36+: API routes against their tests, callers and OpenAPI file."""
+        return dict(self._call(workspace, lambda f: f.contract_gaps()))
+
     def run_events(self, workspace: Path, run_id: str, after: int = 0) -> dict[str, Any]:
         return dict(self._call(workspace, lambda f: f.stream_events(run_id, after)))
 

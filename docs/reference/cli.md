@@ -154,12 +154,23 @@ folder with no source files. See [Diagrams](../guides/diagrams.md#the-code-graph
 
 ```text
 dev docs [WORKSPACE] [--audience novice|practitioner|principal|executive] [--detail brief|standard|deep]
-         [-f, --format md|slides|deck|json] [-o, --output FILE] [--name NAME]
+         [-f, --format md|obsidian|slides|deck|json] [-o, --output FILE] [--name NAME]
+dev docs [WORKSPACE] --site DIR [--generator mkdocs|astro] [--detail ...]
 ```
 
 Documentation for one audience at one depth, every statement linked to its line, ending with its provenance. Writes
 `<file>.manifest.json` with the file's sha256. Exit `2` for an unknown audience, detail or format; `1` if a link
 doesn't resolve. See [Documentation and explanations](../guides/documentation.md).
+
+## `dev review`
+
+```text
+dev review [WORKSPACE] [--base REF] [--spec SPEC.md] [--pr-body FILE] [-o FILE] [--json]
+```
+
+A change against `REF` (default `main`): what changed and what it reaches, blocking and advisory items, what to
+retest, and optionally a draft pull request description. Exit `1` when something blocks it, `2` for an unknown base.
+See [Reviewing a change](../guides/review.md).
 
 ## `dev explain`
 

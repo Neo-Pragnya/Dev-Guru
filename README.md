@@ -50,6 +50,7 @@ dev explain cart.py                  # one file from novice to executive, every 
 dev docs . --audience principal      # documentation for architects, with provenance
 dev mentor                           # advice only on failures that repeat across Ananke runs
 dev spec trace specs/feature.md      # each requirement linked to the code and tests that meet it
+dev review --base main --pr-body PR.md   # blocking vs advisory, what to retest, a draft PR description
 dev explore . --profile public       # a report safe to publish: no source, docstrings or Git revision
 dev sources                          # capabilities from your folders, private Git and Dex Trove
 dev serve                            # a local web interface: live runs, the code graph, your capabilities

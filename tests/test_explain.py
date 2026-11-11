@@ -173,3 +173,79 @@ def test_the_ladder_says_more_than_the_docstring_and_cites_all_of_it(shop) -> No
         assert len(statements) > 1
         assert all(st["evidence"] for st in statements)
         assert check_evidence(exp, result.model) == []
+
+
+def test_maps_evidence_obsidian_and_sites(shop, tmp_path: Path) -> None:
+    """CAP-rich-documentation-02..04: source-linked graph and evidence, Obsidian links, MkDocs and Astro sites."""
+    root, result = shop
+    evidence = {
+        "counts": {"fix now": 1, "fix soon": 0, "later": 0},
+        "findings": [
+            {
+                "tier": "fix now",
+                "kind": "code",
+                "severity": "high",
+                "message": "SQL from a string",
+                "path": "backend/hostile.py",
+                "line": 6,
+                "rule": "sqli",
+            }
+        ],
+        "rerun": [{"gate": "semgrep", "command": "semgrep scan --config auto backend/hostile.py"}],
+    }
+    doc = docs.build(result.model, result.manifest, audience="principal", evidence=evidence)
+    ids = [s["id"] for s in doc["sections"]]
+    assert "map" in ids and "evidence" in ids and ids[-1] == "limitations"
+    text = docs.to_markdown(doc, root=root, out_dir=root)
+    assert "```mermaid\n%% dev-guru/subgraph@1" in text and "flowchart LR" in text
+    assert "SQL from a string" in text and "[backend/hostile.py:6](backend/hostile.py#L6)" in text
+    assert docs.check_links(text, root) == []
+    wiki = docs.to_markdown(doc, root=root, out_dir=root, wikilinks=True)
+    assert (
+        "[[backend/hostile.py|backend/hostile.py:6]]" in wiki
+        and "](backend/hostile.py#L6)" not in wiki
+    )
+    assert docs.check_wikilinks(wiki, root) == []
+    assert docs.check_wikilinks("see [[nope/missing.py|x]]", root) == [
+        "[[nope/missing.py]]: no such file in the vault"
+    ]
+    for generator, nav in (("mkdocs", "mkdocs-nav.yml"), ("astro", "astro-sidebar.json")):
+        out = tmp_path / generator
+        done = docs.site(
+            result.model,
+            result.manifest,
+            root=root,
+            out_dir=out,
+            generator=generator,
+            evidence=evidence,
+        )
+        assert done["nav"] == nav and sorted(p.name for p in out.iterdir()) == sorted(
+            [*done["pages"], nav]
+        )
+        for page in done["pages"]:
+            assert docs.check_links((out / page).read_text(), out) == [] or page == "index.md"
+    sidebar = json.loads((tmp_path / "astro" / "astro-sidebar.json").read_text())
+    assert sidebar[0] == {"label": "Home", "link": "index"} and len(sidebar) == 5
+    assert "  - Architecture: principal.md" in (tmp_path / "mkdocs" / "mkdocs-nav.yml").read_text()
+    with pytest.raises(docs.DocsError, match="unknown generator"):
+        docs.site(
+            result.model, result.manifest, root=root, out_dir=tmp_path / "x", generator="hugo"
+        )
+
+
+def test_cli_obsidian_and_site(shop, tmp_path: Path) -> None:
+    root, _ = shop
+    runner = CliRunner()
+    note = root / "vault-note.md"
+    res = runner.invoke(
+        app, ["docs", str(root), "--audience", "practitioner", "-f", "obsidian", "-o", str(note)]
+    )
+    assert res.exit_code == 0, res.output
+    assert "[[" in note.read_text()
+    res = runner.invoke(
+        app, ["docs", str(root), "--site", str(root / "site"), "--generator", "astro"]
+    )
+    assert res.exit_code == 0, res.output
+    assert (root / "site" / "astro-sidebar.json").is_file() and (
+        root / "site" / "executive.md"
+    ).is_file()
