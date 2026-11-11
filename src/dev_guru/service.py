@@ -366,6 +366,39 @@ def code_review(
     return reviewing.review(result.model, change, findings, trace), result
 
 
+def spec_context(
+    spec: Path, workspace: Path, *, client: AnankeClient | None = None
+) -> tuple[dict[str, Any], ExploreResult]:
+    """The spec traced against the code, with the explore result it came from (nothing recorded)."""
+    from dev_guru import spec as specs
+
+    try:
+        text = spec.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise errors.GuruError(errors.INVALID_INPUT, f"can't read {spec}: {exc}") from exc
+    result = explore(workspace, client=client)
+    try:
+        return specs.trace(text, spec.name, result.model, result.workspace), result
+    except specs.SpecError as exc:
+        raise errors.GuruError(errors.INVALID_INPUT, str(exc)) from exc
+
+
+def record(
+    result: ExploreResult, name: str, data: dict[str, Any], *, client: AnankeClient | None = None
+) -> None:
+    """Keep ``data`` as an artifact of the Ananke run that read the code, when the transport has runs."""
+    if client is None or not result.run_id:
+        return
+    client.register_artifact(
+        result.workspace,
+        result.run_id,
+        name,
+        (json.dumps(data, indent=2, ensure_ascii=False) + "\n").encode(),
+        media_type="application/json",
+        input_refs=[str(result.manifest["input_digest"])],
+    )
+
+
 __all__ = [
     "ExploreResult",
     "code_review",
@@ -377,5 +410,7 @@ __all__ = [
     "graph_export",
     "learning_map",
     "mentor_feedback",
+    "record",
+    "spec_context",
     "spec_trace",
 ]

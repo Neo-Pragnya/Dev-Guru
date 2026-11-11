@@ -42,3 +42,33 @@ The trace is recorded as `spec-trace.json` in the Ananke run that read the code,
 digest. `ananke app evidence` lists it, so the trace stays with the code it was made against.
 
 There's no language model involved: the same spec and code always give the same trace.
+
+## Test first: plan, tests, verify
+
+```bash
+dev spec plan specs/pricing.md            # kind, risk and tests for each requirement; tasks in order
+dev spec tests specs/pricing.md           # failing tests for requirements with none (tests/spec/)
+dev spec tests specs/pricing.md --style gherkin --out features
+dev spec verify specs/pricing.md          # run the tests that name each requirement
+```
+
+- **Plan:** each requirement is classified by what it states, with fixed rules: *behaviour*, *state*, *invariant*
+  ("never", "at most", "unique"), *interface* (API, request, status), *security* (role, token, secret) or
+  *performance* (latency, "within"). Each kind brings its tests (an invariant gets a property test, an interface a
+  contract test, security negative tests). Risk is high for invariants and security, or when the code reaches a
+  quarter of the project. A requirement that says "after R1" comes after R1 in the task list.
+- **Tests:** one failing test file per requirement with no test, named after its id and failing with what's missing.
+  Existing files are never overwritten.
+- **Verify:** runs, with pytest, the tests that name each requirement. A requirement is *done* only when it's linked
+  to code, has tests and they pass. The result is kept in the Ananke run; exit `1` while any is open.
+
+## Lock before building
+
+```bash
+dev spec lock specs/pricing.md            # specs/pricing.md.lock.json
+dev spec trace specs/pricing.md --check-lock
+```
+
+The lock holds each requirement's text digest and the digest of every file the spec names. `--check-lock` reports
+requirements added, removed or reworded and named code that changed since, and exits `1` on any drift.
+

@@ -47,4 +47,8 @@ surface:
   - dev mentor
   - dev spec new
   - dev spec trace
+  - dev spec plan
+  - dev spec tests
+  - dev spec verify
+  - dev spec lock
   - dev review

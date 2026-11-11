@@ -10,6 +10,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
 
 ---
 
+## [0.14.0] — 2026-11-11
+
+### Added
+
+- **`dev spec plan`:** each requirement's kind (behaviour, state, invariant, interface, security, performance), its
+  risk, the tests that fit it, and the tasks in dependency order.
+- **`dev spec tests`:** failing pytest or Gherkin tests for requirements with none, never overwriting a file.
+- **`dev spec verify`:** runs the tests that name each requirement; done means linked, tested and passing. Kept in
+  the Ananke run.
+- **`dev spec lock` and `dev spec trace --check-lock`:** requirements and named code locked before building; drift
+  in either is reported.
+
+---
+
 ## [0.13.1] — 2026-11-10
 
 ### Changed
