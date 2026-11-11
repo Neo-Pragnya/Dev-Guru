@@ -217,9 +217,13 @@ await journey("framed in a page, each view fills the frame, and it plays until s
   expect(row.tabs < 60, `the tabs take ${row.tabs}px of the frame`);
   expect(row.stage > 150, `the stage is only ${row.stage}px tall`);
   expect(row.right <= row.width, `the stage runs off the frame: ${row.right} of ${row.width}`);
-  await sleep(5600);
-  const next = await evaluate(`document.querySelector('.tab[aria-selected="true"]').dataset.view`);
-  expect(next !== first, "it didn't move on");
+  // it moves on every few seconds; poll for up to 15 s, so a busy machine doesn't fail a working page
+  let next = first;
+  for (let waited = 0; waited < 15000 && next === first; waited += 500) {
+    await sleep(500);
+    next = await evaluate(`document.querySelector('.tab[aria-selected="true"]').dataset.view`);
+  }
+  expect(next !== first, "it didn't move on within 15 s");
   await send("Input.dispatchMouseEvent", { type: "mousePressed", x: 300, y: 200, button: "left", clickCount: 1 });
   await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: 300, y: 200, button: "left", clickCount: 1 });
   await sleep(5600);

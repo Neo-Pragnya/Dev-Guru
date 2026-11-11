@@ -20,6 +20,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
 - **`dev docs`:** documentation for one audience at one depth (`brief`, `standard`, `deep`), as Markdown, slides,
   an offline deck or JSON. Every link is checked before the file is kept, it ends with its provenance, and a manifest
   with its sha256 is written next to it. Text from the code is escaped.
+- **`dev spec new` and `dev spec trace`:** a spec from an idea, then each requirement traced to the code it names
+  (linked), code its words match (possible, inferred) or nothing (unlinked), and to tests that mention its id. With
+  `--level`, the code behind each requirement is explained at that level. The trace is kept in the Ananke run.
 - **`dev mentor`:** advice on failures repeated across this workspace's Ananke runs, at four levels, each naming
   its runs and what the failure code means, with reviewed lessons on the same thing linked. A failure seen once gets
   no advice.
@@ -33,6 +36,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
 
 ### Fixed
 
+- A browser journey waited a fixed 5.6 s for the embedded explorer to move on, and failed on a busy machine; it now
+  polls for up to 15 s.
 - Diagram labels moved clear of each other no longer fall outside the SVG.
 
 ---

@@ -93,6 +93,17 @@ dev mentor [WORKSPACE] [--level novice|practitioner|principal|executive] [--min-
 Advice on failures repeated across this workspace's Ananke runs, each naming its runs. Exit `2` for an unknown level
 or `--min-repeats` below 2.
 
+## `dev spec new` and `dev spec trace`
+
+```text
+dev spec new NAME [--idea TEXT] [-o, --output FILE]
+dev spec trace SPEC.md [-w, --workspace DIR] [--level LEVEL] [-o, --output FILE] [--json]
+```
+
+A spec template from an idea (never overwrites), and each requirement traced to the code (linked, possible or
+unlinked) and to the tests that mention its id. The trace is recorded in the Ananke run. Exit `2` when the file
+exists, can't be read, or has no requirements. See [Spec-driven work](../guides/specs.md).
+
 ## `dev serve`
 
 ```bash

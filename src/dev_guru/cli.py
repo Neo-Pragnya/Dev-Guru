@@ -292,6 +292,74 @@ learning_app = typer.Typer(
     help="Review what Ananke learned before it becomes reusable memory.", no_args_is_help=True
 )
 app.add_typer(learning_app, name="learning")
+spec_app = typer.Typer(
+    help="Spec-driven work: write a spec from an idea and trace its requirements to the code."
+)
+app.add_typer(spec_app, name="spec")
+
+
+@spec_app.command("new")
+def spec_new(
+    name: Annotated[str, typer.Argument(help="What it's called")],
+    idea: Annotated[
+        str, typer.Option(help="The idea in a sentence or two: it becomes the Problem")
+    ] = "",
+    output: Annotated[
+        Path | None, typer.Option("--output", "-o", help="Spec file (default specs/<name>.md)")
+    ] = None,
+) -> None:
+    """A spec to fill in: problem, users, outcomes, requirements with ids, acceptance, scope and open questions."""
+    import re as _re
+
+    from dev_guru import spec as specs
+
+    slug = _re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "spec"
+    out = output or Path("specs") / f"{slug}.md"
+    if out.exists():
+        typer.echo(
+            f"error: {out} already exists; choose another name or --output ({errors.INVALID_INPUT})",
+            err=True,
+        )
+        raise typer.Exit(2)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(specs.template(name, idea), encoding="utf-8")
+    typer.echo(f"Wrote {out}. Fill in the requirements, then run: dev spec trace {out}")
+
+
+@spec_app.command("trace")
+def spec_trace(
+    spec: Annotated[Path, typer.Argument(help="A spec with requirement ids (R1, REQ-2, ...)")],
+    workspace: Annotated[Path, typer.Option("--workspace", "-w", help="Project")] = Path("."),
+    level: Annotated[
+        str | None,
+        typer.Option(
+            help="Also explain the code behind each requirement: novice, practitioner, principal or executive"
+        ),
+    ] = None,
+    output: Annotated[
+        Path | None, typer.Option("--output", "-o", help="Write Markdown here")
+    ] = None,
+    transport: TransportOpt = "in-process",
+    as_json: JsonOpt = False,
+) -> None:
+    """Each requirement traced to the code: linked (it names the code), possible (inferred from its words) or
+    unlinked, and whether a test mentions its id. The trace is recorded in the Ananke run that read the code."""
+    from dev_guru import spec as specs
+
+    try:
+        tr = service.spec_trace(spec, workspace, client=connect(transport), level=level)
+    except errors.GuruError as exc:
+        typer.echo(f"error: {exc.message} ({exc.code})", err=True)
+        raise typer.Exit(2) from exc
+    if as_json:
+        typer.echo(json.dumps(tr, indent=2, ensure_ascii=False))
+        return
+    text = specs.trace_markdown(tr)
+    if output:
+        output.write_text(text, encoding="utf-8")
+        typer.echo(f"Wrote {output}", err=True)
+    else:
+        typer.echo(text)
 
 
 @learning_app.command("review")

@@ -295,6 +295,42 @@ def learning_map(workspace: Path, *, client: AnankeClient | None = None) -> dict
     return mentor.learning_graph(_candidates(client, root), files=files)
 
 
+def spec_trace(
+    spec: Path,
+    workspace: Path,
+    *,
+    client: AnankeClient | None = None,
+    level: str | None = None,
+) -> dict[str, Any]:
+    """Trace a spec's requirements to the code (``dev-guru/spec-trace@1``), and record the trace in the Ananke run
+    that analysed the code, so the harness keeps it with the revision it was made against."""
+    from dev_guru import spec as specs
+
+    client = client or connect()
+    try:
+        text = spec.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise errors.GuruError(errors.INVALID_INPUT, f"can't read {spec}: {exc}") from exc
+    result = explore(workspace, client=client)
+    try:
+        tr = specs.trace(text, spec.name, result.model, result.workspace, level=level)
+    except specs.SpecError as exc:
+        raise errors.GuruError(errors.INVALID_INPUT, str(exc)) from exc
+    tr["source_revision"] = result.manifest.get("workspace", {}).get("commit")
+    tr["input_digest"] = result.manifest.get("input_digest")
+    tr["run_id"] = result.run_id or None
+    if result.run_id:
+        client.register_artifact(
+            result.workspace,
+            result.run_id,
+            "spec-trace.json",
+            (json.dumps(tr, indent=2, ensure_ascii=False) + "\n").encode(),
+            media_type="application/json",
+            input_refs=[spec.name, str(result.manifest["input_digest"])],
+        )
+    return tr
+
+
 __all__ = [
     "ExploreResult",
     "documentation",
@@ -305,4 +341,5 @@ __all__ = [
     "graph_export",
     "learning_map",
     "mentor_feedback",
+    "spec_trace",
 ]

@@ -23,6 +23,7 @@ capabilities:
   - { id: process-codesign, title: "dev bpmn viewer: walk the process through its decisions, every route listed, steps edited and downloaded as Markdown that Ananke reads back; hostile names stay text", dimension: experience, blocker: true }
   - { id: mentor-feedback, title: "dev mentor: advice only for failures repeated across real Ananke runs, each naming its runs and meaning; one-offs get none", dimension: core, blocker: true }
   - { id: learning-graph, title: "dev learning graph: lessons, their runs, the files they mention and shared terms; read-only", dimension: core, blocker: false }
+  - { id: spec-trace, title: "dev spec: a spec from an idea; each requirement linked, possibly matched or unlinked, its tests found, explained at a level, and recorded in the Ananke run", dimension: core, blocker: true }
   - { id: gateway, title: "dev serve: loopback only, single-use login, origin and CSRF checks, scoped workspaces; a run reaches real Ananke", dimension: security, blocker: true }
   - { id: web-shell, title: "The web interface ships in the wheel, needs no Node, works by keyboard and on a phone, and says plainly what isn't in this version", dimension: experience, blocker: true }
   - { id: run-console, title: "The run console catches up after a lost connection or a gap, survives a tab reload, and only cancels when asked", dimension: experience, blocker: true }
@@ -43,3 +44,5 @@ surface:
   - dev learning review
   - dev learning graph
   - dev mentor
+  - dev spec new
+  - dev spec trace
