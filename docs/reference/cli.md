@@ -86,6 +86,17 @@ opens on the explorer, with all of its views, the same as a report. `--logs FILE
 with the full trace of anything unexpected, but never a request's query, which can hold the sign-in link. It
 listens on this computer only and prints a link that works once. Stop it with Ctrl-C. Exits `2` if a folder doesn't exist or the port is taken.
 
+## `dev bpmn`
+
+```text
+dev bpmn PROCESS.md|PROCESS.bpmn [-o, --output PAGE] [--xml FILE] [--svg FILE] [--markdown FILE] [-w, --workspace DIR]
+```
+
+Swimlanes, an offline viewer and BPMN 2.0 from a process Ananke reads. The viewer walks the process, lists every way
+through it, and lets you edit steps and download Markdown. `--markdown` writes that format directly. Exit `1` when
+the process doesn't hold together (the viewer says why), `2` when the file can't be read. See
+[Business processes](../guides/business-processes.md).
+
 ## `dev diagram`
 
 ```text

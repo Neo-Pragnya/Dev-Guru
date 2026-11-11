@@ -414,10 +414,21 @@ def bpmn(
     svg: Annotated[
         Path | None, typer.Option("--svg", help="Also write the swimlane drawing here")
     ] = None,
+    markdown: Annotated[
+        Path | None,
+        typer.Option(
+            "--markdown",
+            help="Also write the process as Markdown dev bpmn reads (to edit it as text)",
+        ),
+    ] = None,
     workspace: Annotated[Path, typer.Option("--workspace", "-w")] = Path("."),
     transport: TransportOpt = "in-process",
 ) -> None:
-    """Swimlanes and BPMN from a reviewed process. Ananke reads it, nothing is guessed, and nothing runs."""
+    """Swimlanes and BPMN from a reviewed process. Ananke reads it, nothing is guessed, and nothing runs.
+
+    The viewer walks through the process (you choose at each decision), lists every way through it, and lets you
+    rename steps and lanes and download the result as Markdown to run through dev bpmn again.
+    """
     from dev_guru import bpmn as drawing
 
     try:
@@ -438,6 +449,8 @@ def bpmn(
         xml.write_text(answer["bpmn"], encoding="utf-8")
     if svg:
         svg.write_text(drawing.render(model), encoding="utf-8")
+    if markdown:
+        markdown.write_text(drawing.to_markdown(model), encoding="utf-8")
     typer.echo(f"Wrote {page}: {len(model['lanes'])} lanes and {len(model['nodes'])} steps")
     for problem in model["problems"]:
         typer.echo(f"problem: {problem}", err=True)

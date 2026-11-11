@@ -20,6 +20,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
 - **`dev docs`:** documentation for one audience at one depth (`brief`, `standard`, `deep`), as Markdown, slides,
   an offline deck or JSON. Every link is checked before the file is kept, it ends with its provenance, and a manifest
   with its sha256 is written next to it. Text from the code is escaped.
+- **Co-designing a process in the `dev bpmn` viewer:** walk it step by step (choosing at each decision), see every
+  way through it (loops listed once), rename steps and lanes, and download Markdown that `dev bpmn` reads back.
+  `dev bpmn --markdown FILE` writes the same format, including from a `.bpmn` file.
 - **Contract tests for the explorer view model:** it round-trips through the page, keeps its ids when unrelated
   files change, and every edge, snippet, hotspot and insight points at something real.
 
