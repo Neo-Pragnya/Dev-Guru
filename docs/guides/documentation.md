@@ -73,6 +73,11 @@ A site has `index.md`, `novice.md`, `practitioner.md`, `principal.md` and `execu
 into `mkdocs.yml` or the Astro sidebar. Every link is checked before anything is written; Obsidian links must name a
 file in the vault.
 
+Run it again after the code changes and only pages whose content changed are rewritten. A page someone edited after it
+was generated, or a hand-written page with the same name, is never overwritten: the new version is written beside it
+as `<page>.proposed.md`, with `<page>.diff` to review. `.dev-guru-site.json` records what was written; `--force`
+overwrites edited pages anyway.
+
 ## Limits
 
 - Python is analysed in full; other languages contribute what the repository analysis finds (routes, tables,

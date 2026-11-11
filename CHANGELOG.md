@@ -10,6 +10,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
 
 ---
 
+## [0.13.1] — 2026-11-10
+
+### Changed
+
+- **`dev docs --site` updates incrementally and never overwrites edits.** Unchanged pages are left alone. A page
+  edited after it was generated, or a hand-written page with the same name, is kept: the new version goes beside it
+  as `<page>.proposed.md` with a `<page>.diff`. `--force` overwrites anyway.
+
+---
+
 ## [0.13.0] — 2026-11-10
 
 ### Added

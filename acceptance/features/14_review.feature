@@ -34,3 +34,13 @@ Feature: A change is reviewed from Git, the code graph and the project's own rep
     When I run "dev docs . -f obsidian -o notes.md"
     Then it succeeds
     And the file "notes.md" contains "[[shop/"
+
+  @cap_docs_audiences @adversarial
+  Scenario: Regenerating a site never overwrites a page someone edited
+    When I run "dev docs . --site site"
+    Then it succeeds
+    When I run "echo 'A reviewer note.' >> site/principal.md && dev docs . --site site"
+    Then it succeeds
+    And the output contains "1 kept because they were edited"
+    And the file "site/principal.md" contains "A reviewer note."
+    And the file "site/principal.diff" contains "(generated)"

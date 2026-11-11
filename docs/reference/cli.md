@@ -155,7 +155,7 @@ folder with no source files. See [Diagrams](../guides/diagrams.md#the-code-graph
 ```text
 dev docs [WORKSPACE] [--audience novice|practitioner|principal|executive] [--detail brief|standard|deep]
          [-f, --format md|obsidian|slides|deck|json] [-o, --output FILE] [--name NAME]
-dev docs [WORKSPACE] --site DIR [--generator mkdocs|astro] [--detail ...]
+dev docs [WORKSPACE] --site DIR [--generator mkdocs|astro] [--force] [--detail ...]
 ```
 
 Documentation for one audience at one depth, every statement linked to its line, ending with its provenance. Writes

@@ -11,6 +11,7 @@ add links, HTML or table cells.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -653,8 +654,15 @@ def site(
     generator: str = "mkdocs",
     detail: str = "standard",
     evidence: dict[str, Any] | None = None,
+    force: bool = False,
 ) -> dict[str, Any]:
-    """A page per audience, an index, and the navigation for MkDocs or Astro. Every link is checked first."""
+    """A page per audience, an index, and the navigation for MkDocs or Astro. Every link is checked first.
+
+    Updating a site is incremental and never overwrites someone's edits. ``SITE_MANIFEST`` records the sha256 of each
+    file as written; on the next run an unchanged page is left alone, and a file changed since it was written (or a
+    hand-written file with the same name) is kept: the new version goes beside it as ``<name>.proposed.md`` with a
+    ``<name>.diff`` to review. ``force`` overwrites anyway.
+    """
     if generator not in GENERATORS:
         raise DocsError(f"unknown generator {generator!r}; choose {', '.join(GENERATORS)}")
     titles = {
@@ -695,10 +703,69 @@ def site(
             + "\n"
         )
     out_dir.mkdir(parents=True, exist_ok=True)
-    for name, text in pages.items():
-        (out_dir / name).write_text(text, encoding="utf-8")
-    (out_dir / nav_file).write_text(nav_text, encoding="utf-8")
-    return {"pages": order, "nav": nav_file, "generator": generator}
+    written, unchanged, kept = _write_site(out_dir, {**pages, nav_file: nav_text}, force=force)
+    return {
+        "pages": order,
+        "nav": nav_file,
+        "generator": generator,
+        "written": written,
+        "unchanged": unchanged,
+        "kept": kept,
+    }
+
+
+SITE_MANIFEST = ".dev-guru-site.json"
+
+
+def _sha(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _write_site(
+    out_dir: Path, files: dict[str, str], *, force: bool
+) -> tuple[list[str], list[str], list[str]]:
+    import difflib
+
+    record_path = out_dir / SITE_MANIFEST
+    try:
+        record = json.loads(record_path.read_text(encoding="utf-8")).get("files", {})
+    except (OSError, ValueError):
+        record = {}
+    written, unchanged, kept = [], [], []
+    new_record = dict(record)
+    for name, text in files.items():
+        target = out_dir / name
+        current = target.read_text(encoding="utf-8") if target.is_file() else None
+        if current == text:
+            unchanged.append(name)
+            new_record[name] = _sha(text)
+            continue
+        edited = current is not None and record.get(name) != _sha(current)
+        if current is not None and edited and not force:  # someone changed or wrote it: propose
+            stem = name.rsplit(".", 1)[0]
+            (out_dir / f"{stem}.proposed.{name.rsplit('.', 1)[-1]}").write_text(
+                text, encoding="utf-8"
+            )
+            diff = difflib.unified_diff(
+                current.splitlines(keepends=True),
+                text.splitlines(keepends=True),
+                fromfile=f"{name} (yours)",
+                tofile=f"{name} (generated)",
+            )
+            (out_dir / f"{stem}.diff").write_text("".join(diff), encoding="utf-8")
+            kept.append(name)
+            continue
+        target.write_text(text, encoding="utf-8")
+        new_record[name] = _sha(text)
+        written.append(name)
+    record_path.write_text(
+        json.dumps(
+            {"schema": "dev-guru/site-record@1", "files": new_record}, indent=2, sort_keys=True
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return written, unchanged, kept
 
 
 def check_links(markdown: str, out_dir: Path) -> list[str]:

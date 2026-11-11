@@ -220,7 +220,7 @@ def test_maps_evidence_obsidian_and_sites(shop, tmp_path: Path) -> None:
             evidence=evidence,
         )
         assert done["nav"] == nav and sorted(p.name for p in out.iterdir()) == sorted(
-            [*done["pages"], nav]
+            [*done["pages"], nav, docs.SITE_MANIFEST]
         )
         for page in done["pages"]:
             assert docs.check_links((out / page).read_text(), out) == [] or page == "index.md"
@@ -249,3 +249,35 @@ def test_cli_obsidian_and_site(shop, tmp_path: Path) -> None:
     assert (root / "site" / "astro-sidebar.json").is_file() and (
         root / "site" / "executive.md"
     ).is_file()
+
+
+def test_site_updates_are_incremental_and_keep_hand_edits(shop, tmp_path: Path) -> None:
+    """CAP-repo-autodocs-03/04: unchanged pages are left alone; edited or hand-written ones are never overwritten."""
+    root, result = shop
+    out = tmp_path / "site"
+    out.mkdir()
+    (out / "novice.md").write_text(
+        "# Our own welcome page\n"
+    )  # written by a person before the first run
+    first = docs.site(result.model, result.manifest, root=root, out_dir=out)
+    assert (
+        first["kept"] == ["novice.md"]
+        and (out / "novice.md").read_text() == "# Our own welcome page\n"
+    )
+    assert (out / "novice.proposed.md").is_file() and "(generated)" in (
+        out / "novice.diff"
+    ).read_text()
+    assert "index.md" in first["written"] and (out / docs.SITE_MANIFEST).is_file()
+    again = docs.site(result.model, result.manifest, root=root, out_dir=out)
+    assert again["written"] == [] and "principal.md" in again["unchanged"]
+    page = out / "principal.md"
+    page.write_text(page.read_text() + "\nA note a reviewer added.\n")
+    third = docs.site(result.model, result.manifest, root=root, out_dir=out)
+    assert (
+        third["kept"] == ["novice.md", "principal.md"]
+        and "A note a reviewer added." in page.read_text()
+    )
+    forced = docs.site(result.model, result.manifest, root=root, out_dir=out, force=True)
+    assert (
+        set(forced["written"]) == {"novice.md", "principal.md"} and "A note" not in page.read_text()
+    )
