@@ -62,11 +62,12 @@ acceptance:
 acceptance-wheel: build
 	$(MAKE) acceptance-dist
 
-# Against an already-built dist/*.whl (CI tests the exact artifact it publishes).
+# Against an already-built dist/*.whl (CI tests the exact artifact it publishes). ACCEPTANCE_PINS adds or pins
+# packages in the same environment, e.g. ACCEPTANCE_PINS="ananke-plexus==0.3.33 dex-trove" (the compatibility matrix).
 acceptance-dist:
 	rm -rf $(ACCEPTANCE_VENV)
 	$(UV) venv -q --python 3.12 $(ACCEPTANCE_VENV)
 	$(UV) pip install -q --python $(ACCEPTANCE_VENV)/bin/python "$$(ls -t dist/*.whl | head -1)$(if $(ACCEPTANCE_EXTRAS),[$(ACCEPTANCE_EXTRAS)])" \
-	  pytest pytest-bdd pytest-xdist pyyaml
+	  pytest pytest-bdd pytest-xdist pyyaml $(ACCEPTANCE_PINS)
 	ACCEPTANCE_BIN_DIR=$(CURDIR)/$(ACCEPTANCE_VENV)/bin $(ACCEPTANCE_VENV)/bin/python -m pytest acceptance \
 	  -n auto -p no:cacheprovider $(ACCEPTANCE_ARGS)

@@ -237,7 +237,8 @@ def render(model: dict[str, Any], *, animate: bool = True, title: str = "") -> s
         mx = (a[0] + b[0]) / 2
         d = f"M{a[0]:.1f},{a[1]:.1f} C{mx:.1f},{a[1]:.1f} {mx:.1f},{b[1]:.1f} {b[0]:.1f},{b[1]:.1f}"
         hyp = r.get("status") != "cited"
-        label_text = r["label"] + (" ?" if hyp else "")
+        inferred = r.get("status") == "inferred"  # code graphs: found through imports, not stated
+        label_text = r["label"] + (" ?" if hyp and not inferred else "")
         cite = r.get("citation") or {}
         tip = (
             f"{labels[r['from']]} → {labels[r['to']]}"
@@ -245,6 +246,8 @@ def render(model: dict[str, Any], *, animate: bool = True, title: str = "") -> s
             + (
                 f" — {cite.get('file')}:{cite.get('line')}"
                 if not hyp
+                else f" — inferred through imports, {cite.get('file')}:{cite.get('line')}"
+                if inferred
                 else " — hypothesis: no citation holds up"
             )
         )
@@ -261,11 +264,14 @@ def render(model: dict[str, Any], *, animate: bool = True, title: str = "") -> s
     for e in model["entities"]:
         x, y = pos[e["id"]]
         lines = ", ".join(str(n) for n in e.get("citations", [])[:4])
+        tip = e["label"] + (f" (lines {lines})" if lines else "")
         nodes.append(
-            f'<g class="node"><title>{html.escape(e["label"])} (lines {lines})</title>'
+            f'<g class="node"><title>{html.escape(tip)}</title>'
             f'<rect x="{x:.1f}" y="{y:.1f}" width="{nw}" height="{nh}" rx="12"/>'
             f'<text x="{x + nw / 2:.1f}" y="{y + nh / 2 + 5:.1f}">{html.escape(e["label"][:24])}</text></g>'
         )
+    # a label moved down to stay clear of the others can end below the last node: make room for it
+    height = max(height, round(max(box[3] for box in taken) + pad))
     anim = (
         ".edge path{stroke-dasharray:6 8;animation:flow 1.6s linear infinite;animation-delay:calc(var(--k)*-.2s)}"
         "@keyframes flow{to{stroke-dashoffset:-28}}"
@@ -277,7 +283,8 @@ def render(model: dict[str, Any], *, animate: bool = True, title: str = "") -> s
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width:.0f} {height:.0f}" role="img" aria-labelledby="t d" font-family="Inter, system-ui, sans-serif">'
         f'<title id="t">{heading}</title><desc id="d">{len(model["relations"])} relationships between {len(model["entities"])} entities; '
-        f"{sum(1 for r in model['relations'] if r.get('status') != 'cited')} marked as hypotheses.</desc>"
+        f"{sum(1 for r in model['relations'] if r.get('status') == 'hypothesis')} marked as hypotheses, "
+        f"{sum(1 for r in model['relations'] if r.get('status') == 'inferred')} inferred.</desc>"
         "<style>"
         ".node rect{fill:#15172f;stroke:#ffb347;stroke-width:1.5}.node text{fill:#efedf9;font-size:14px;text-anchor:middle}"
         ".edge path{fill:none;stroke:#3dd6c6;stroke-width:2}.edge text{fill:#c9cbe6;font-size:12px;text-anchor:middle;paint-order:stroke;stroke:#0d0e1c;stroke-width:4px}"

@@ -9,8 +9,10 @@ with GuruClient(workspace="./my-project") as guru:
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types import TracebackType
+from typing import Any
 
 from dev_guru import service
 from dev_guru.client import AnankeClient, HarnessInfo, connect
@@ -46,11 +48,29 @@ class GuruClient:
         output: str | Path,
         format: str = "html",
         title: str | None = None,
+        **graph: Any,
     ) -> Path:
-        if format != "html":
-            raise ValueError(f"unsupported export format {format!r}; supported: html")
-        page, _ = service.export_html(result, Path(output), title=title, client=self.client)
-        return page
+        """Write the explorer (``html``), or the code graph as ``mermaid``, ``svg`` or ``json``.
+
+        Graph formats take ``level``, ``focus``, ``depth`` and ``budget`` (see ``dev graph``)."""
+        from dev_guru.reports import subgraph
+
+        path = Path(output)
+        if format == "html":
+            page, _ = service.export_html(result, path, title=title, client=self.client)
+            return page
+        if format not in subgraph.FORMATS:
+            raise ValueError(
+                f"unsupported export format {format!r}; supported: html, {', '.join(subgraph.FORMATS)}"
+            )
+        sub = subgraph.select(result.model, **graph)
+        if format == "json":
+            path.write_text(json.dumps(sub, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        elif format == "svg":
+            path.write_text(subgraph.to_svg(sub), encoding="utf-8")
+        else:
+            path.write_text(subgraph.to_mermaid(sub), encoding="utf-8")
+        return path
 
 
 __all__ = ["GuruClient"]

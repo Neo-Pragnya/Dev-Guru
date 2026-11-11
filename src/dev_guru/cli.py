@@ -292,6 +292,74 @@ learning_app = typer.Typer(
     help="Review what Ananke learned before it becomes reusable memory.", no_args_is_help=True
 )
 app.add_typer(learning_app, name="learning")
+spec_app = typer.Typer(
+    help="Spec-driven work: write a spec from an idea and trace its requirements to the code."
+)
+app.add_typer(spec_app, name="spec")
+
+
+@spec_app.command("new")
+def spec_new(
+    name: Annotated[str, typer.Argument(help="What it's called")],
+    idea: Annotated[
+        str, typer.Option(help="The idea in a sentence or two: it becomes the Problem")
+    ] = "",
+    output: Annotated[
+        Path | None, typer.Option("--output", "-o", help="Spec file (default specs/<name>.md)")
+    ] = None,
+) -> None:
+    """A spec to fill in: problem, users, outcomes, requirements with ids, acceptance, scope and open questions."""
+    import re as _re
+
+    from dev_guru import spec as specs
+
+    slug = _re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "spec"
+    out = output or Path("specs") / f"{slug}.md"
+    if out.exists():
+        typer.echo(
+            f"error: {out} already exists; choose another name or --output ({errors.INVALID_INPUT})",
+            err=True,
+        )
+        raise typer.Exit(2)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(specs.template(name, idea), encoding="utf-8")
+    typer.echo(f"Wrote {out}. Fill in the requirements, then run: dev spec trace {out}")
+
+
+@spec_app.command("trace")
+def spec_trace(
+    spec: Annotated[Path, typer.Argument(help="A spec with requirement ids (R1, REQ-2, ...)")],
+    workspace: Annotated[Path, typer.Option("--workspace", "-w", help="Project")] = Path("."),
+    level: Annotated[
+        str | None,
+        typer.Option(
+            help="Also explain the code behind each requirement: novice, practitioner, principal or executive"
+        ),
+    ] = None,
+    output: Annotated[
+        Path | None, typer.Option("--output", "-o", help="Write Markdown here")
+    ] = None,
+    transport: TransportOpt = "in-process",
+    as_json: JsonOpt = False,
+) -> None:
+    """Each requirement traced to the code: linked (it names the code), possible (inferred from its words) or
+    unlinked, and whether a test mentions its id. The trace is recorded in the Ananke run that read the code."""
+    from dev_guru import spec as specs
+
+    try:
+        tr = service.spec_trace(spec, workspace, client=connect(transport), level=level)
+    except errors.GuruError as exc:
+        typer.echo(f"error: {exc.message} ({exc.code})", err=True)
+        raise typer.Exit(2) from exc
+    if as_json:
+        typer.echo(json.dumps(tr, indent=2, ensure_ascii=False))
+        return
+    text = specs.trace_markdown(tr)
+    if output:
+        output.write_text(text, encoding="utf-8")
+        typer.echo(f"Wrote {output}", err=True)
+    else:
+        typer.echo(text)
 
 
 @learning_app.command("review")
@@ -329,6 +397,45 @@ def learning_review(
         console.print(f"{name}: {state} → {out}")
     if open_browser:
         webbrowser.open(out.resolve().as_uri())
+
+
+@learning_app.command("graph")
+def learning_graph(
+    workspace: Annotated[Path, typer.Option("--workspace", "-w")] = Path("."),
+    fmt: Annotated[str, typer.Option("--format", "-f", help="mermaid or json")] = "mermaid",
+    output: Annotated[
+        Path | None, typer.Option("--output", "-o", help="Write here instead of printing")
+    ] = None,
+    transport: TransportOpt = "in-process",
+) -> None:
+    """A map of what has been learned: each lesson, the runs it came from, the files it mentions, and the terms
+    lessons share. It only reads; promote a reviewed lesson with `ananke learning promote`."""
+    from dev_guru import mentor
+
+    if fmt not in ("mermaid", "json"):
+        typer.echo(
+            f"error: unknown format {fmt!r}; choose mermaid or json ({errors.INVALID_INPUT})",
+            err=True,
+        )
+        raise typer.Exit(2)
+    try:
+        graph = service.learning_map(workspace, client=connect(transport))
+    except errors.GuruError as exc:
+        typer.echo(f"error: {exc.message} ({exc.code})", err=True)
+        raise typer.Exit(2) from exc
+    text = (
+        json.dumps(graph, indent=2, ensure_ascii=False) + "\n"
+        if fmt == "json"
+        else mentor.graph_mermaid(graph)
+    )
+    if output:
+        output.write_text(text, encoding="utf-8")
+        typer.echo(
+            f"Wrote {output}: {graph['lessons']} lessons, {len(graph['patterns'])} shared terms",
+            err=True,
+        )
+    else:
+        typer.echo(text, nl=False)
 
 
 @app.command()
@@ -414,10 +521,21 @@ def bpmn(
     svg: Annotated[
         Path | None, typer.Option("--svg", help="Also write the swimlane drawing here")
     ] = None,
+    markdown: Annotated[
+        Path | None,
+        typer.Option(
+            "--markdown",
+            help="Also write the process as Markdown dev bpmn reads (to edit it as text)",
+        ),
+    ] = None,
     workspace: Annotated[Path, typer.Option("--workspace", "-w")] = Path("."),
     transport: TransportOpt = "in-process",
 ) -> None:
-    """Swimlanes and BPMN from a reviewed process. Ananke reads it, nothing is guessed, and nothing runs."""
+    """Swimlanes and BPMN from a reviewed process. Ananke reads it, nothing is guessed, and nothing runs.
+
+    The viewer walks through the process (you choose at each decision), lists every way through it, and lets you
+    rename steps and lanes and download the result as Markdown to run through dev bpmn again.
+    """
     from dev_guru import bpmn as drawing
 
     try:
@@ -438,11 +556,245 @@ def bpmn(
         xml.write_text(answer["bpmn"], encoding="utf-8")
     if svg:
         svg.write_text(drawing.render(model), encoding="utf-8")
+    if markdown:
+        markdown.write_text(drawing.to_markdown(model), encoding="utf-8")
     typer.echo(f"Wrote {page}: {len(model['lanes'])} lanes and {len(model['nodes'])} steps")
     for problem in model["problems"]:
         typer.echo(f"problem: {problem}", err=True)
     if model["problems"]:
         raise typer.Exit(1)
+
+
+@app.command()
+def mentor(
+    workspace: Annotated[Path, typer.Argument(help="Project whose Ananke runs to read")] = Path(
+        "."
+    ),
+    level: Annotated[
+        str, typer.Option(help="novice, practitioner, principal or executive")
+    ] = "practitioner",
+    min_repeats: Annotated[
+        int,
+        typer.Option(help="Advise only on failures seen in at least this many runs (2 or more)"),
+    ] = 2,
+    output: Annotated[
+        Path | None, typer.Option("--output", "-o", help="Write Markdown here")
+    ] = None,
+    transport: TransportOpt = "in-process",
+    as_json: JsonOpt = False,
+) -> None:
+    """Advice from evidence: failures that repeat across this workspace's Ananke runs, what they mean, and any
+    reviewed lesson on the same thing. Nothing is a judgement of style, and a failure seen once gets no advice."""
+    from dev_guru import mentor as mentoring
+
+    try:
+        fb = service.mentor_feedback(
+            workspace, client=connect(transport), level=level, min_repeats=min_repeats
+        )
+    except errors.GuruError as exc:
+        typer.echo(f"error: {exc.message} ({exc.code})", err=True)
+        raise typer.Exit(2) from exc
+    if as_json:
+        typer.echo(json.dumps(fb, indent=2, ensure_ascii=False))
+        return
+    text = mentoring.feedback_markdown(fb)
+    if output:
+        output.write_text(text, encoding="utf-8")
+        typer.echo(f"Wrote {output}: {len(fb['advice'])} pieces of advice", err=True)
+    else:
+        typer.echo(text)
+
+
+@app.command()
+def docs(
+    workspace: Annotated[Path, typer.Argument(help="Project to document")] = Path("."),
+    audience: Annotated[
+        str, typer.Option(help="novice, practitioner, principal or executive")
+    ] = "practitioner",
+    detail: Annotated[str, typer.Option(help="brief, standard or deep")] = "standard",
+    fmt: Annotated[
+        str,
+        typer.Option(
+            "--format", "-f", help="md, slides (Markdown for dev present), deck (HTML) or json"
+        ),
+    ] = "md",
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", "-o", help="File to write (default dev-guru-<audience>.<ext>)"),
+    ] = None,
+    name: Annotated[str | None, typer.Option(help="Project name shown in the document")] = None,
+    transport: TransportOpt = "in-process",
+) -> None:
+    """Documentation for one audience at one depth, written from the code, every statement linked to its line.
+
+    It ends with its provenance (revision, versions, the model's digest), and a manifest with the file's sha256 is
+    written next to it. Every link is checked before the file is kept.
+    """
+    import hashlib
+
+    from dev_guru import present as deck
+    from dev_guru.explain import docs as writer
+
+    ext = {"md": "md", "slides": "slides.md", "deck": "html", "json": "json"}
+    if fmt not in ext:
+        typer.echo(
+            f"error: unknown format {fmt!r}; choose {', '.join(ext)} ({errors.INVALID_INPUT})",
+            err=True,
+        )
+        raise typer.Exit(2)
+    try:
+        doc, result = service.documentation(
+            workspace, client=connect(transport), audience=audience, detail=detail, name=name
+        )
+    except errors.GuruError as exc:
+        typer.echo(f"error: {exc.message} ({exc.code})", err=True)
+        raise typer.Exit(2) from exc
+    out = output or Path(f"dev-guru-{audience}.{ext[fmt]}")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if fmt == "json":
+        text = json.dumps(doc, indent=2, ensure_ascii=False) + "\n"
+    elif fmt == "md":
+        text = writer.to_markdown(doc, root=result.workspace, out_dir=out.parent.resolve())
+        broken = writer.check_links(text, out.parent.resolve())
+        if broken:  # a renderer bug, not the user's input: never keep a document with broken links
+            typer.echo("error: broken links: " + "; ".join(broken[:5]), err=True)
+            raise typer.Exit(1)
+    else:
+        text = writer.to_slides(doc)
+        if fmt == "deck":
+            text = deck.build(text, out.parent)
+            problems = deck.check(text)
+            if problems:
+                typer.echo("error: " + "; ".join(problems), err=True)
+                raise typer.Exit(1)
+    out.write_text(text, encoding="utf-8")
+    receipt = {
+        "schema": "dev-guru/document-manifest@1",
+        "document": out.name,
+        "format": fmt,
+        "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        "audience": audience,
+        "detail": detail,
+        **doc["provenance"],
+    }
+    sidecar = out.with_name(out.name + ".manifest.json")
+    sidecar.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+    statements = sum(len(s["statements"]) for s in doc["sections"])
+    typer.echo(
+        f"Wrote {out}: {len(doc['sections'])} sections, {statements} statements · manifest {sidecar.name}"
+    )
+
+
+@app.command()
+def explain(
+    focus: Annotated[str, typer.Argument(help="A file, a symbol, path:name or an id")],
+    workspace: Annotated[Path, typer.Option("--workspace", "-w", help="Project")] = Path("."),
+    level: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--level",
+            "-l",
+            help="novice, practitioner, principal or executive (repeat; default all)",
+        ),
+    ] = None,
+    output: Annotated[
+        Path | None, typer.Option("--output", "-o", help="Write Markdown here")
+    ] = None,
+    transport: TransportOpt = "in-process",
+    as_json: JsonOpt = False,
+) -> None:
+    """Explain one file or symbol from novice to executive, every statement tied to the lines it comes from.
+
+    Nothing is generated by a model: the same code gives the same explanation. Calls found through imports are
+    marked inferred.
+    """
+    from dev_guru.explain import docs as writer
+
+    try:
+        exp, result = service.explanation(
+            workspace, focus, client=connect(transport), levels=tuple(level) if level else None
+        )
+    except errors.GuruError as exc:
+        typer.echo(f"error: {exc.message} ({exc.code})", err=True)
+        raise typer.Exit(2) from exc
+    if as_json:
+        typer.echo(json.dumps(exp, indent=2, ensure_ascii=False))
+        return
+    out_dir = (output.parent if output else Path(".")).resolve()
+    text = writer.explanation_markdown(exp, root=result.workspace, out_dir=out_dir)
+    if output:
+        output.write_text(text, encoding="utf-8")
+        typer.echo(f"Wrote {output}", err=True)
+    else:
+        typer.echo(text)
+
+
+@app.command()
+def graph(
+    workspace: Annotated[Path, typer.Argument(help="Project to draw")] = Path("."),
+    level: Annotated[str, typer.Option(help="package, file or symbol")] = "file",
+    focus: Annotated[
+        str | None,
+        typer.Option(help="Start here: an id, a path, a file name or a symbol name"),
+    ] = None,
+    depth: Annotated[int, typer.Option(help="How many steps out from --focus")] = 1,
+    budget: Annotated[int, typer.Option(help="The most nodes to draw (1 to 400)")] = 40,
+    fmt: Annotated[str, typer.Option("--format", "-f", help="mermaid, svg or json")] = "mermaid",
+    output: Annotated[
+        Path | None, typer.Option("--output", "-o", help="Write here instead of printing")
+    ] = None,
+    static: Annotated[bool, typer.Option("--static", help="SVG without animation")] = False,
+    name: Annotated[str | None, typer.Option(help="Project name shown in the drawing")] = None,
+    transport: TransportOpt = "in-process",
+) -> None:
+    """Draw part of the code graph as Mermaid or SVG, small enough to read and expand a step at a time.
+
+    Nodes marked +N have N neighbours that weren't drawn; the output names the command that shows them.
+    Inferred calls are dashed.
+    """
+    from dev_guru.diagram import svg_problems
+    from dev_guru.reports import subgraph
+
+    if fmt not in subgraph.FORMATS:
+        typer.echo(
+            f"error: unknown format {fmt!r}; choose {', '.join(subgraph.FORMATS)} ({errors.INVALID_INPUT})",
+            err=True,
+        )
+        raise typer.Exit(2)
+    try:
+        sub = service.graph_export(
+            workspace,
+            client=connect(transport),
+            level=level,
+            focus=focus,
+            depth=depth,
+            budget=budget,
+            name=name,
+        )
+    except errors.GuruError as exc:
+        typer.echo(f"error: {exc.message} ({exc.code})", err=True)
+        raise typer.Exit(2) from exc
+    if fmt == "json":
+        text = json.dumps(sub, indent=2, ensure_ascii=False) + "\n"
+    elif fmt == "svg":
+        text = subgraph.to_svg(sub, animate=not static)
+        problems = svg_problems(text)
+        if problems:  # never write an unsafe SVG, whatever the names in the code
+            typer.echo("error: " + "; ".join(problems), err=True)
+            raise typer.Exit(1)
+    else:
+        text = subgraph.to_mermaid(sub)
+    if output:
+        output.write_text(text, encoding="utf-8")
+        typer.echo(
+            f"Wrote {output}: {len(sub['nodes'])} nodes, {len(sub['edges'])} edges"
+            + (f", {sub['omitted']['nodes']} not drawn" if sub["omitted"]["nodes"] else ""),
+            err=True,
+        )
+    else:
+        typer.echo(text, nl=False)
+    if sub["expand"]:
+        typer.echo(f"more: {sub['expand']}", err=True)
 
 
 @app.command()

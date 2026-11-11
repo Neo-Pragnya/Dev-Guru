@@ -42,3 +42,18 @@ Dev Guru never analyses code itself. Every graph, workflow and piece of evidence
   the supported version range moves with Ananke's own typed facade.
 
 See also [Architecture](architecture.md) and the [CLI reference](../reference/cli.md).
+
+## Which versions are tested together
+
+Every pull request runs the full acceptance suite on the built wheel four times:
+
+| Ananke | Dex Trove | Route |
+| --- | --- | --- |
+| the oldest version Dev Guru accepts (read from `pyproject.toml`) | not installed | internal only |
+| the oldest version Dev Guru accepts | installed | Dex |
+| the newest on PyPI | not installed | internal only |
+| the newest on PyPI | installed | Dex |
+
+So the declared range is the tested range, and Dev Guru works the same with or without Dex. Locally:
+`make acceptance-wheel ACCEPTANCE_PINS="ananke-plexus==0.3.33 dex-trove"`.
+

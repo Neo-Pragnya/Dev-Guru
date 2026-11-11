@@ -8,6 +8,41 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
 
 ## [Unreleased]
 
+### Added
+
+- **`dev graph`:** part of the code graph as Mermaid, SVG or JSON. Choose a level (package, file or symbol), a focus,
+  a depth and a node budget. Nodes with neighbours left out show `+N`, and the command that draws them is printed, so a
+  diagram grows a step at a time. Imports and calls between two nodes share one edge; inferred calls are dashed. The
+  SDK's `export()` takes the same formats.
+- **`dev explain`:** one file or symbol explained at four levels: novice, practitioner, principal and executive.
+  Every statement cites its file and line and says whether it was observed, derived or inferred. No language model:
+  the same code gives the same explanation.
+- **`dev docs`:** documentation for one audience at one depth (`brief`, `standard`, `deep`), as Markdown, slides,
+  an offline deck or JSON. Every link is checked before the file is kept, it ends with its provenance, and a manifest
+  with its sha256 is written next to it. Text from the code is escaped.
+- **`dev spec new` and `dev spec trace`:** a spec from an idea, then each requirement traced to the code it names
+  (linked), code its words match (possible, inferred) or nothing (unlinked), and to tests that mention its id. With
+  `--level`, the code behind each requirement is explained at that level. The trace is kept in the Ananke run.
+- **`dev mentor`:** advice on failures repeated across this workspace's Ananke runs, at four levels, each naming
+  its runs and what the failure code means, with reviewed lessons on the same thing linked. A failure seen once gets
+  no advice.
+- **`dev learning graph`:** the lessons captured from runs, the runs and files they relate to, and the terms several
+  lessons share. Read-only.
+- **Co-designing a process in the `dev bpmn` viewer:** walk it step by step (choosing at each decision), see every
+  way through it (loops listed once), rename steps and lanes, and download Markdown that `dev bpmn` reads back.
+  `dev bpmn --markdown FILE` writes the same format, including from a `.bpmn` file.
+- **Contract tests for the explorer view model:** it round-trips through the page, keeps its ids when unrelated
+  files change, and every edge, snippet, hotspot and insight points at something real.
+
+- **A compatibility matrix in CI:** the acceptance suite runs on the built wheel against the oldest Ananke Dev Guru
+  accepts and the newest, each with and without Dex Trove.
+
+### Fixed
+
+- A browser journey waited a fixed 5.6 s for the embedded explorer to move on, and failed on a busy machine; it now
+  polls for up to 15 s.
+- Diagram labels moved clear of each other no longer fall outside the SVG.
+
 ---
 
 ## [0.11.3] — 2026-11-06

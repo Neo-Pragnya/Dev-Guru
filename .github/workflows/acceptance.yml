@@ -43,3 +43,53 @@ jobs:
           name: acceptance-report
           path: acceptance/report/
           if-no-files-found: warn
+
+  compatibility:
+    # The supported-version matrix: the same wheel and scenarios on the oldest Ananke Dev Guru declares and on the
+    # newest, each without Dex (the internal route) and with Dex Trove installed (the Dex route). The floor is read
+    # from pyproject.toml, so it can't drift from what the package declares.
+    name: compatibility (ananke ${{ matrix.ananke }}, ${{ matrix.route }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        ananke: [floor, latest]
+        route: [internal, dex]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081
+        with:
+          version: "latest"
+          enable-cache: false
+
+      - name: Choose the versions
+        id: pins
+        env:
+          ANANKE: ${{ matrix.ananke }}
+          ROUTE: ${{ matrix.route }}
+        run: |
+          floor=$(sed -n 's/.*"ananke-plexus>=\([0-9.]*\),.*/\1/p' pyproject.toml)
+          test -n "$floor" || { echo "no ananke-plexus floor in pyproject.toml"; exit 1; }
+          pins=""
+          if [ "$ANANKE" = "floor" ]; then pins="ananke-plexus==$floor"; fi
+          if [ "$ROUTE" = "dex" ]; then pins="$pins dex-trove"; fi
+          echo "pins=$pins" >> "$GITHUB_OUTPUT"
+          echo "Ananke $ANANKE (floor $floor), route $ROUTE: pins '$pins'" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build the wheel and run the scenarios against it
+        env:
+          PINS: ${{ steps.pins.outputs.pins }}
+        run: make acceptance-wheel ACCEPTANCE_PINS="$PINS"
+
+      - name: Record what was tested
+        if: always()
+        run: |
+          .acceptance-venv/bin/python -m pip list --format=freeze 2>/dev/null \
+            | grep -iE '^(dev-guru|ananke-plexus|dex-trove|pydantic)==' >> "$GITHUB_STEP_SUMMARY" || true
+          .acceptance-venv/bin/python -c 'import importlib.metadata as m; [print(p, m.version(p)) for p in ("dev-guru", "ananke-plexus", "pydantic")]' >> "$GITHUB_STEP_SUMMARY"

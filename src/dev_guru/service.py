@@ -183,4 +183,163 @@ def export_html(
     return page, sidecar
 
 
-__all__ = ["ExploreResult", "explore", "explorer_model", "export_html"]
+def graph_export(
+    workspace: Path,
+    *,
+    client: AnankeClient | None = None,
+    level: str = "file",
+    focus: str | None = None,
+    depth: int = 1,
+    budget: int = 40,
+    name: str | None = None,
+) -> dict[str, Any]:
+    """A bounded piece of the code graph (``dev-guru/subgraph@1``), ready for Mermaid or SVG.
+
+    It builds the graph and nothing else: no repository analysis and no run record, so it's quick to call again
+    with a bigger depth or budget.
+    """
+    from dev_guru.reports import subgraph
+
+    client = client or connect()
+    root = workspace.expanduser().resolve()
+    graph = client.graph_data(root)
+    model = view_model.build(graph, root, project_name=name)
+    if not model["files"]:
+        raise errors.GuruError(
+            errors.WORKSPACE_INVALID,
+            f"Ananke found no source files in {root}",
+            hint="point dev graph at a folder with Python, JavaScript or TypeScript files, or notebooks",
+        )
+    try:
+        return subgraph.select(model, level=level, focus=focus, depth=depth, budget=budget)
+    except subgraph.SubgraphError as exc:
+        raise errors.GuruError(errors.INVALID_INPUT, str(exc)) from exc
+
+
+def explanation(
+    workspace: Path,
+    focus: str,
+    *,
+    client: AnankeClient | None = None,
+    levels: tuple[str, ...] | None = None,
+) -> tuple[dict[str, Any], ExploreResult]:
+    """One file or symbol explained at each level of the ladder (``dev-guru/explanation@1``)."""
+    from dev_guru import explain as ladder
+
+    result = explore(workspace, client=client)
+    try:
+        return ladder.explain(result.model, focus, levels=levels or ladder.LEVELS), result
+    except ladder.ExplainError as exc:
+        raise errors.GuruError(errors.INVALID_INPUT, str(exc)) from exc
+
+
+def documentation(
+    workspace: Path,
+    *,
+    client: AnankeClient | None = None,
+    audience: str = "practitioner",
+    detail: str = "standard",
+    name: str | None = None,
+) -> tuple[dict[str, Any], ExploreResult]:
+    """Documentation for one audience at one depth (``dev-guru/documentation@1``)."""
+    from dev_guru.explain import docs
+
+    result = explore(workspace, client=client, name=name)
+    try:
+        return docs.build(result.model, result.manifest, audience=audience, detail=detail), result
+    except docs.DocsError as exc:
+        raise errors.GuruError(errors.INVALID_INPUT, str(exc)) from exc
+
+
+def _candidates(client: AnankeClient, root: Path) -> list[dict[str, Any]]:
+    return [
+        client.learning_candidate(root, n).model_dump() for n in client.learning_candidates(root)
+    ]
+
+
+def mentor_feedback(
+    workspace: Path,
+    *,
+    client: AnankeClient | None = None,
+    level: str = "practitioner",
+    min_repeats: int = 2,
+) -> dict[str, Any]:
+    """Advice on failures that repeat across this workspace's Ananke runs (``dev-guru/mentor-feedback@1``)."""
+    from dev_guru import mentor
+
+    client = client or connect()
+    root = workspace.expanduser().resolve()
+    runs = client.run_history(root).get("runs", [])
+    try:
+        return mentor.feedback(
+            runs, _candidates(client, root), level=level, min_repeats=min_repeats
+        )
+    except ValueError as exc:
+        raise errors.GuruError(errors.INVALID_INPUT, str(exc)) from exc
+
+
+def learning_map(workspace: Path, *, client: AnankeClient | None = None) -> dict[str, Any]:
+    """The learning candidates, the runs they came from and the files they mention (``dev-guru/learning-graph@1``)."""
+    from dev_guru import mentor
+
+    client = client or connect()
+    root = workspace.expanduser().resolve()
+    files = []
+    for path in root.rglob("*"):
+        rel = path.relative_to(root)
+        if any(part.startswith(".") for part in rel.parts) or not path.is_file():
+            continue
+        files.append(rel.as_posix())
+        if len(files) >= 20_000:
+            break
+    return mentor.learning_graph(_candidates(client, root), files=files)
+
+
+def spec_trace(
+    spec: Path,
+    workspace: Path,
+    *,
+    client: AnankeClient | None = None,
+    level: str | None = None,
+) -> dict[str, Any]:
+    """Trace a spec's requirements to the code (``dev-guru/spec-trace@1``), and record the trace in the Ananke run
+    that analysed the code, so the harness keeps it with the revision it was made against."""
+    from dev_guru import spec as specs
+
+    client = client or connect()
+    try:
+        text = spec.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise errors.GuruError(errors.INVALID_INPUT, f"can't read {spec}: {exc}") from exc
+    result = explore(workspace, client=client)
+    try:
+        tr = specs.trace(text, spec.name, result.model, result.workspace, level=level)
+    except specs.SpecError as exc:
+        raise errors.GuruError(errors.INVALID_INPUT, str(exc)) from exc
+    tr["source_revision"] = result.manifest.get("workspace", {}).get("commit")
+    tr["input_digest"] = result.manifest.get("input_digest")
+    tr["run_id"] = result.run_id or None
+    if result.run_id:
+        client.register_artifact(
+            result.workspace,
+            result.run_id,
+            "spec-trace.json",
+            (json.dumps(tr, indent=2, ensure_ascii=False) + "\n").encode(),
+            media_type="application/json",
+            input_refs=[spec.name, str(result.manifest["input_digest"])],
+        )
+    return tr
+
+
+__all__ = [
+    "ExploreResult",
+    "documentation",
+    "explanation",
+    "explore",
+    "explorer_model",
+    "export_html",
+    "graph_export",
+    "learning_map",
+    "mentor_feedback",
+    "spec_trace",
+]

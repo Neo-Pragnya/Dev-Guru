@@ -75,6 +75,35 @@ Writes a review page for a learning candidate: what still blocks promotion, the 
 review decision, provenance, and a diff against each destination. Reviewing changes nothing. Approve with
 `ananke learning review --approve`, then promote with `ananke learning promote`.
 
+## `dev learning graph`
+
+```text
+dev learning graph [-w, --workspace DIR] [-f, --format mermaid|json] [-o, --output FILE]
+```
+
+Lessons, the runs they came from, the files they mention and the terms they share. Read-only. See
+[Mentoring from evidence](../guides/mentoring.md).
+
+## `dev mentor`
+
+```text
+dev mentor [WORKSPACE] [--level novice|practitioner|principal|executive] [--min-repeats N] [-o FILE] [--json]
+```
+
+Advice on failures repeated across this workspace's Ananke runs, each naming its runs. Exit `2` for an unknown level
+or `--min-repeats` below 2.
+
+## `dev spec new` and `dev spec trace`
+
+```text
+dev spec new NAME [--idea TEXT] [-o, --output FILE]
+dev spec trace SPEC.md [-w, --workspace DIR] [--level LEVEL] [-o, --output FILE] [--json]
+```
+
+A spec template from an idea (never overwrites), and each requirement traced to the code (linked, possible or
+unlinked) and to the tests that mention its id. The trace is recorded in the Ananke run. Exit `2` when the file
+exists, can't be read, or has no requirements. See [Spec-driven work](../guides/specs.md).
+
 ## `dev serve`
 
 ```bash
@@ -86,6 +115,17 @@ opens on the explorer, with all of its views, the same as a report. `--logs FILE
 with the full trace of anything unexpected, but never a request's query, which can hold the sign-in link. It
 listens on this computer only and prints a link that works once. Stop it with Ctrl-C. Exits `2` if a folder doesn't exist or the port is taken.
 
+## `dev bpmn`
+
+```text
+dev bpmn PROCESS.md|PROCESS.bpmn [-o, --output PAGE] [--xml FILE] [--svg FILE] [--markdown FILE] [-w, --workspace DIR]
+```
+
+Swimlanes, an offline viewer and BPMN 2.0 from a process Ananke reads. The viewer walks the process, lists every way
+through it, and lets you edit steps and download Markdown. `--markdown` writes that format directly. Exit `1` when
+the process doesn't hold together (the viewer says why), `2` when the file can't be read. See
+[Business processes](../guides/business-processes.md).
+
 ## `dev diagram`
 
 ```text
@@ -95,6 +135,40 @@ dev diagram DOCUMENT.md [-o, --output FILE] [--model FILE] [--from-model FILE] [
 An animated SVG of the relationships a document states, each cited by file and line. See
 [Diagrams from documents](../guides/diagrams.md). Exit `2` when the document has no explicit relationships or a file is
 missing or malformed.
+
+## `dev graph`
+
+```text
+dev graph [WORKSPACE] [--level package|file|symbol] [--focus NAME] [--depth N] [--budget N]
+          [-f, --format mermaid|svg|json] [-o, --output FILE] [--static] [--name NAME]
+```
+
+A piece of the code graph small enough to read: everything within `--depth` steps of `--focus` (an id, a path, a
+file name or a symbol name), at most `--budget` nodes (default 40, up to 400). Without `--focus`, the best-connected
+nodes. A node marked `+N` has N neighbours that weren't drawn, and the command that shows them is printed to stderr
+(`more: dev graph ...`). Imports and calls between the same two nodes share one edge (`imports · 3 calls`); inferred
+calls are dashed. Prints Mermaid by default. Exit `2` for an unknown or ambiguous focus, a budget out of range, or a
+folder with no source files. See [Diagrams](../guides/diagrams.md#the-code-graph).
+
+## `dev docs`
+
+```text
+dev docs [WORKSPACE] [--audience novice|practitioner|principal|executive] [--detail brief|standard|deep]
+         [-f, --format md|slides|deck|json] [-o, --output FILE] [--name NAME]
+```
+
+Documentation for one audience at one depth, every statement linked to its line, ending with its provenance. Writes
+`<file>.manifest.json` with the file's sha256. Exit `2` for an unknown audience, detail or format; `1` if a link
+doesn't resolve. See [Documentation and explanations](../guides/documentation.md).
+
+## `dev explain`
+
+```text
+dev explain FOCUS [-w, --workspace DIR] [-l, --level LEVEL]... [-o, --output FILE] [--json]
+```
+
+One file or symbol (a path, a name, `path:name` or an id) explained at each level. Exit `2` when the name is unknown
+or used more than once (the message lists the candidates).
 
 ## `dev present`
 
