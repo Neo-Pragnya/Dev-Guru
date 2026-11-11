@@ -34,6 +34,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
 - **Contract tests for the explorer view model:** it round-trips through the page, keeps its ids when unrelated
   files change, and every edge, snippet, hotspot and insight points at something real.
 
+- **A compatibility matrix in CI:** the acceptance suite runs on the built wheel against the oldest Ananke Dev Guru
+  accepts and the newest, each with and without Dex Trove.
+
 ### Fixed
 
 - A browser journey waited a fixed 5.6 s for the embedded explorer to move on, and failed on a busy machine; it now
