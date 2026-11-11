@@ -8,6 +8,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
 
 ## [Unreleased]
 
+---
+
+## [0.12.0] — 2026-11-10
+
 ### Added
 
 - **`dev graph`:** part of the code graph as Mermaid, SVG or JSON. Choose a level (package, file or symbol), a focus,
