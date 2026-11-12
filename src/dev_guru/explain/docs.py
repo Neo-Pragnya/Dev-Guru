@@ -182,6 +182,42 @@ def _risks(facts: Facts, limit: int) -> dict[str, Any]:
     return _section("risks", "Where the risk is", out)
 
 
+def _testing(facts: Facts, limit: int) -> dict[str, Any] | None:
+    """How the repository is tested, from Ananke's test topology: suites, what they exercise, what no test imports."""
+    t = (facts.model.get("repository") or {}).get("tests") or {}
+    if t.get("status") != "found":
+        return None
+    out = [
+        _say(
+            f"{t.get('files')} test files hold {t.get('tests')} tests; {t.get('imported_by_tests')} of "
+            f"{t.get('source_files')} source files are imported by a test.",
+            "observed",
+        )
+    ]
+    if t.get("untested_count"):
+        out.append(
+            _say(
+                f"{t['untested_count']} source files aren't imported by any test, such as "
+                + ", ".join(f"`{p}`" for p in (t.get("untested") or [])[: min(limit, 5)])
+                + ". A test may still reach them another way, so check coverage before writing tests for them.",
+                "derived",
+                *(((p, 0)) for p in (t.get("untested") or [])[: min(limit, 5)]),
+            )
+        )
+    rows: list[tuple[list[str], list[tuple[str, int]]]] = [
+        ([str(kind), str(framework), str(files), str(tests), str(ex)], [])
+        for kind, framework, files, tests, ex in t.get("suites") or []
+    ]
+    return _section(
+        "testing",
+        "How it's tested",
+        out,
+        table=_table(
+            ["Kind", "Framework", "Files", "Tests", "Code exercised"], rows[: max(limit, 5)]
+        ),
+    )
+
+
 def _limitations(facts: Facts) -> dict[str, Any]:
     return _section(
         "limitations",
@@ -450,6 +486,7 @@ def build(
             _risks(facts, n),
             *_interfaces(facts, n),
             _complexity(facts, n),
+            *([s] if (s := _testing(facts, n)) else []),
         ]
     elif audience == "practitioner":
         sections += [
@@ -458,6 +495,7 @@ def build(
             *_files(facts, n, detail == "deep"),
             *_interfaces(facts, n),
             _complexity(facts, n),
+            *([s] if (s := _testing(facts, n)) else []),
         ]
     else:
         sections += [

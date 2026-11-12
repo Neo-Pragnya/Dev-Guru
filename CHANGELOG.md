@@ -10,6 +10,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
 
 ---
 
+## [0.15.0] — 2026-11-12
+
+### Added
+
+- **How it's tested:** the test topology from Ananke 0.3.44 (suites by kind and framework, the code each exercises,
+  source files no test imports) in the explorer's Coverage page, in `dev docs` for practitioners and principals, and in
+  the report's repository view. Public reports keep the counts and leave out paths.
+
+### Changed
+
+- Needs Ananke Plexus 0.3.44, which also fixes analysing a repository whose own folder is a Python package (it used
+  to hang).
+- pytest 9.2 with pytest-bdd 9.0.1.
+
 ## [0.14.0] — 2026-11-11
 
 ### Added

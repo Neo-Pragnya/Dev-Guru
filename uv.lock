@@ -9,7 +9,7 @@ resolution-markers = [
 
 [[package]]
 name = "ananke-plexus"
-version = "0.3.36"
+version = "0.3.44"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
@@ -22,9 +22,9 @@ dependencies = [
     { name = "rich" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/1d/2e/202045218cf0a32e9957d0162e4d135ec3d09b971d5ae3c19642ba3de656/ananke_plexus-0.3.36.tar.gz", hash = "sha256:ea094becbb92b38e57f3c24c9f017bbc7ab69f60791eb4c80a1b658b71597ab1", size = 6953957, upload-time = "2026-11-11T04:05:18.675Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/95/79/d3231313e3f10a7ccaa8bdceba8d58f614c7cc9f98e1e7713d686e9b832a/ananke_plexus-0.3.44.tar.gz", hash = "sha256:e521a259d4d1277e4423366e5a62a6d7422cd0a79e836881a86511866f5f2dab", size = 7062598, upload-time = "2026-11-12T04:03:44.317Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5c/42/1fac0ad903bb86e3c1cf5669d44976ad59897aa9a537f5be1a054b0ad6ac/ananke_plexus-0.3.36-py3-none-any.whl", hash = "sha256:df1ef3d9e45843d679389e374cbafc5f90da0075953a1e167a2e658a4b2900e4", size = 4001965, upload-time = "2026-11-11T04:05:16.052Z" },
+    { url = "https://files.pythonhosted.org/packages/5b/c6/9e7b5538f58bec416aa4932f829dff60392e0ba681c3a74a4c240ab593da/ananke_plexus-0.3.44-py3-none-any.whl", hash = "sha256:b27c2db601c36b00c4e84e05c507cbadc3eccf4666b44053492f531439ef2acc", size = 4129699, upload-time = "2026-11-12T04:03:41.718Z" },
 ]
 
 [[package]]
@@ -295,14 +295,14 @@ dex = [
 
 [package.metadata]
 requires-dist = [
-    { name = "ananke-plexus", specifier = ">=0.3.36,<0.4" },
+    { name = "ananke-plexus", specifier = ">=0.3.44,<0.4" },
     { name = "dex-trove", marker = "extra == 'dex'", specifier = ">=0.1.6" },
     { name = "hatchling", marker = "extra == 'dev'", specifier = ">=1.26" },
     { name = "markdown-it-py", specifier = ">=3,<5" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.15" },
     { name = "pydantic", specifier = ">=2.11,<2.14.3" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8" },
-    { name = "pytest-bdd", marker = "extra == 'dev'", specifier = ">=8" },
+    { name = "pytest-bdd", marker = "extra == 'dev'", specifier = ">=9.0.1" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=6" },
     { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3" },
     { name = "pyyaml", marker = "extra == 'dev'", specifier = ">=6" },

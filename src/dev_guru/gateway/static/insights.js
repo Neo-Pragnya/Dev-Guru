@@ -433,9 +433,23 @@
   });
 
   // ------------------------------------------------------------------ coverage
+  // How the repository is tested, from its files: shown whether or not a coverage report exists
+  const testTopology = (report, root) => {
+    const t = report.sections.tests;
+    if (!t || t.status !== "found") return;
+    root.append(el("h2", { text: "How it's tested" }),
+      el("div", { class: "cards" }, stat(t.files, "Test files"), stat(t.tests, "Tests"), stat(`${t.imported_by_tests} of ${t.source_files}`, "Source files a test imports")),
+      table("test-suites", ["Kind", "Framework", "Files", "Tests", "Code it exercises"], (t.suites || []).map((s) => [s.kind, s.framework, s.files, s.tests, s.exercises_count])));
+    if ((t.untested || []).length) {
+      root.append(el("p", { class: "muted", text: `${t.untested_count} source files no test imports. A test may still reach them over HTTP or a subprocess, so this is inferred; coverage is the stronger evidence.` }),
+        table("test-untested", ["Not imported by any test"], t.untested.map((p) => [p])));
+    }
+  };
+
   views.coverage = page_("Coverage", "What your tests cover, read from a report you already have. Tests aren't run here.", (report) => {
     const coverage = report.sections.coverage;
     const root = main();
+    testTopology(report, root);
     if (coverage.status !== "found") {
       root.append(el("p", { id: "coverage-missing", text: "No coverage report was found, so coverage is unknown here, not zero." }),
         el("p", { class: "muted", text: "To produce one, run your tests with coverage, then analyse again:" }), el("pre", { class: "source" }, el("code", { text: "pytest --cov --cov-report=xml      # Python\nnpx jest --coverage                # JavaScript" })));
