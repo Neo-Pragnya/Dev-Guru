@@ -315,16 +315,16 @@ provides-extras = ["dev", "dex"]
 
 [[package]]
 name = "dex-trove"
-version = "0.1.6"
+version = "0.3.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pyyaml" },
     { name = "rich" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/cc/e3/3ab5230df499977bd10b77d4fcc3a9bbb9a1227e45d9b9fa7c0bcd4c6b16/dex_trove-0.1.6.tar.gz", hash = "sha256:6ce149959fe09fc19f28a985c8483ff38687a5f3f0bb54f0e5e6b2fa9c49e97a", size = 11404398, upload-time = "2026-10-23T02:31:08.539Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/3d/31/b1550ba038809a7e02a7d74439b02d4be33440cd2cb911ccc22dec34359c/dex_trove-0.3.5.tar.gz", hash = "sha256:aa7c5123d3b8b20ae90e8c8364bd5031409f82a8ccdaa74f6fbd262dcd6b803b", size = 23638307, upload-time = "2026-11-05T02:00:32.234Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/00/b8/524511de49cb8c4a3fce6fb66d68c05f2edfc8d584d86998743c61987d72/dex_trove-0.1.6-py3-none-any.whl", hash = "sha256:86915c0d3c807b497def7fa44a5d7e0775926832540324bd35b564bf17b7fa49", size = 14758841, upload-time = "2026-10-23T02:31:05.715Z" },
+    { url = "https://files.pythonhosted.org/packages/74/5c/da7cd9433aa075bf67c56fee3290fed75057309a73874e4d9c02dbb76faf/dex_trove-0.3.5-py3-none-any.whl", hash = "sha256:dee5ecc17f95131bdb24b5f8f4a5274616ba970023f0ed198482fb95d8a0bc3f", size = 31865169, upload-time = "2026-11-05T02:00:28.562Z" },
 ]
 
 [[package]]
