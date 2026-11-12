@@ -23,6 +23,7 @@ def build(report: dict[str, Any]) -> dict[str, Any]:
     quality = sections.get("quality", {})
     coverage = sections.get("coverage", {})
     deps = sections.get("dependencies", {})
+    tests = sections.get("tests", {})
     routes = _rows(api.get("routes"))
     callers: dict[str, list[str]] = {}
     for client in _rows(api.get("clients"), 10_000):
@@ -88,6 +89,25 @@ def build(report: dict[str, Any]) -> dict[str, Any]:
             "line_rate": coverage.get("line_rate"),
             "files": len(coverage.get("files") or []),
         },
+        "tests": {
+            "status": tests.get("status"),
+            "files": tests.get("files"),
+            "tests": tests.get("tests"),
+            "source_files": tests.get("source_files"),
+            "imported_by_tests": tests.get("imported_by_tests"),
+            "suites": [
+                [
+                    s.get("kind"),
+                    s.get("framework"),
+                    s.get("files"),
+                    s.get("tests"),
+                    s.get("exercises_count"),
+                ]
+                for s in _rows(tests.get("suites"))
+            ],
+            "untested_count": tests.get("untested_count"),
+            "untested": _rows(tests.get("untested"), 20),
+        },
         "dependencies": {
             "status": deps.get("status"),
             "packages": len(deps.get("packages") or []),
@@ -127,6 +147,10 @@ def public(view: dict[str, Any]) -> dict[str, Any]:
         "totals": view.get("totals"),
         "hotspots": [],
         "coverage": {"status": (view.get("coverage") or {}).get("status")},
+        "tests": {
+            k: (view.get("tests") or {}).get(k)
+            for k in ("status", "files", "tests", "source_files", "imported_by_tests")
+        },
         "dependencies": {"status": "not_shown", "packages": None, "vulnerabilities": None},
         "reduced": True,
     }

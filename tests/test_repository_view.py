@@ -102,3 +102,22 @@ def test_a_failed_analysis_is_named_and_doesnt_stop_the_report(tmp_path: Path, m
 def test_public_view_handles_an_empty_report() -> None:
     assert profiles.apply({"symbols": [], "files": []}, {}, "public")[0].get("repository") is None
     assert repository.build({})["dependencies"]["vulnerabilities"] is None
+
+
+def test_test_topology_reaches_the_view_docs_and_public_profile(tmp_path: Path) -> None:
+    from dev_guru.explain import docs
+
+    result = service.explore(_shop(tmp_path))
+    tests = result.model["repository"]["tests"]
+    assert tests["status"] == "found" and tests["files"] >= 1 and tests["tests"] >= 2
+    assert tests["suites"] and tests["source_files"] >= tests["imported_by_tests"]
+    doc = docs.build(result.model, result.manifest, audience="practitioner")
+    section = next(s for s in doc["sections"] if s["id"] == "testing")
+    assert section["title"] == "How it's tested" and section["table"]["rows"]
+    public = (
+        profiles.public(result.model)
+        if hasattr(profiles, "public")
+        else repository.public(result.model["repository"])
+    )
+    shown = public["repository"]["tests"] if "repository" in public else public["tests"]
+    assert "untested" not in shown  # paths stay out of a public view

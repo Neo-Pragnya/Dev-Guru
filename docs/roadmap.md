@@ -19,6 +19,7 @@ released.
 | **0.12.0** | `dev graph` (Mermaid and SVG of part of the code graph, expandable), `dev explain` (one file or function at four levels), `dev docs` (documentation per audience, with provenance), `dev spec` (requirements traced to code and tests), `dev mentor` (advice only on repeated failures), `dev learning graph`, and a process viewer you can walk and edit. CI tests the oldest and newest Ananke, with and without Dex |
 | **0.13.0** | `dev review` (what changed and reaches, blocking vs advisory, what to retest, a draft PR description), documentation sites for MkDocs and Astro, Obsidian notes, maps and evidence in the documents. Needs Ananke 0.3.36 |
 | **0.14.0** | Test-first specs: `dev spec plan`, `tests`, `verify` and `lock` with drift checks |
+| **0.15.0** | How it's tested: the test topology in the explorer, the docs and the report. Needs Ananke 0.3.44 |
 | **0.8.0** | A workflow canvas that works from the keyboard. Swimlanes and BPMN 2.0 from a reviewed process |
 | **0.7.0** | Workflows, Documentation and Learning review in the web interface, so nothing is marked as missing |
 | **0.6.0** | One offline file with every page of `dev serve`, and an example that shows them all. Folders of notebooks: code in `%%writefile` cells counts, and a Notebooks page explains each one. Impact and paths on the Code map |
