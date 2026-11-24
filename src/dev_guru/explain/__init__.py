@@ -174,8 +174,8 @@ class Facts:
         queue = deque(starts)
         while queue and len(order) < limit:
             fid = queue.popleft()
-            if fid in order or fid not in self.files:
-                continue
+            if fid in order or fid not in self.files or self.files[fid].get("test"):
+                continue  # never send a newcomer to a test or fixture first
             order.append(fid)
             queue.extend(sorted(self.imports.get(fid, ())))
         return order
@@ -231,7 +231,12 @@ def _file_ladder(facts: Facts, fid: str) -> dict[str, list[dict[str, Any]]]:
         )
     if f.get("entry"):
         novice.append(
-            _say("It's a starting point: running the program begins here.", "observed", (path, 1))
+            _say(
+                "It's a starting point: running the program begins here"
+                + (f" ({f['entry_reason']})." if f.get("entry_reason") else "."),
+                "observed",
+                (path, 1),
+            )
         )
     novice.append(
         _say(

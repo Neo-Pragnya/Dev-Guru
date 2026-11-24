@@ -388,7 +388,9 @@ def _start(facts: Facts, limit: int, *, plain: bool) -> dict[str, Any]:
     for fid in facts.reading_path(limit):
         f = facts.files[fid]
         what = first_sentence(f.get("doc", "")) or (
-            "the program starts here" if f.get("entry") else "no description in the file"
+            "the program starts here" + (f" ({f['entry_reason']})" if f.get("entry_reason") else "")
+            if f.get("entry")
+            else "no description in the file"
         )
         out.append(_say(f"`{f['path']}`: {what}", "observed", (f["path"], 1)))
     section = _section("start", "Where to start", out)

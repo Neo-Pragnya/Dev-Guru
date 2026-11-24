@@ -13,11 +13,11 @@ from pathlib import Path
 from typing import Any
 
 from dev_guru.client.port import GraphData
+from dev_guru.reports import entrypoints
 
 SCHEMA = "dev-guru/explorer@1"
 MAX_SNIPPET_LINES = 60
 MAX_SYMBOLS = 6000
-ENTRY_NAMES = {"__main__.py", "main.py", "cli.py", "app.py", "manage.py", "wsgi.py", "asgi.py"}
 SYMBOL_KINDS = ("class", "function", "method")
 
 
@@ -190,6 +190,13 @@ def build(graph: GraphData, workspace: Path, *, project_name: str | None = None)
             }
         )
 
+    # where the program starts: Dockerfile/compose/Procfile commands, console scripts, app initialisation, __main__;
+    # never tests or fixtures (entrypoints.py)
+    entries = {
+        e.path: e
+        for e in entrypoints.detect(root, [n.path for n in files_raw if n.path.endswith(".py")])
+    }
+    id_by_path = {n.path: n.id for n in files_raw}
     files: list[dict[str, Any]] = []
     packages: dict[str, list[str]] = defaultdict(list)
     for node in files_raw:
@@ -209,7 +216,10 @@ def build(graph: GraphData, workspace: Path, *, project_name: str | None = None)
                 "fan_in": fan_in.get(node.id, 0),
                 "fan_out": fan_out.get(node.id, 0),
                 "external": sorted(m for m, users in external.items() if node.id in users),
-                "entry": node.name in ENTRY_NAMES,
+                "entry": node.path in entries,
+                "entry_kind": entries[node.path].kind if node.path in entries else "",
+                "entry_reason": entries[node.path].reason if node.path in entries else "",
+                "test": entrypoints.is_test_like(node.path),
             }
         )
 
@@ -253,9 +263,10 @@ def build(graph: GraphData, workspace: Path, *, project_name: str | None = None)
             {"name": m, "importers": sorted(users)} for m, users in sorted(external.items())
         ],
         "insights": {
-            "most_depended": [f["id"] for f in ranked_in if f["fan_in"]][:8],
+            "most_depended": [f["id"] for f in ranked_in if f["fan_in"] and not f["test"]][:8],
             "largest": [f["id"] for f in ranked_loc if f["loc"]][:8],
-            "entry_points": [f["id"] for f in files if f["entry"]],
+            # strongest evidence first (deploy command, console script, app object, __main__, file name)
+            "entry_points": [id_by_path[path] for path in entries if path in id_by_path],
             "cycles": _cycles(adjacency),
             "isolated": [f["id"] for f in files if f["id"] not in connected],
         },

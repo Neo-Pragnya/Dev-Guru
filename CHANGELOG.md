@@ -10,6 +10,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — [SemVer](ht
 
 ---
 
+## [0.15.1] — 2026-11-24
+
+### Fixed
+
+- **Entry points start where the program starts, never in a test.** The reading order, the explorer's tour, `dev docs`
+  "Where to start" and the "starting point" explanations used any file named `main.py`, `app.py`, `cli.py` … as an
+  entry point, including scripts in test folders and acceptance fixtures, and with no such name fell back to the most
+  imported file, which could be a test helper. Entry points now come from evidence, strongest first: Dockerfile,
+  compose and Procfile commands (`python -m`, `uvicorn`, `gunicorn`, `streamlit run`, `celery -A` …), console scripts
+  in `pyproject.toml`/`setup.cfg`, modules that create the application (FastAPI, Flask, Django WSGI/ASGI, Typer …), and
+  `__main__` blocks; a conventional file name is only a last resort. Tests, fixtures, examples, docs and benchmarks are
+  never entry points, and the reading order skips them. Each entry point says why it was chosen (`entry_kind`,
+  `entry_reason`), and the tour and explanations show that reason.
+
 ## [0.15.0] — 2026-11-12
 
 ### Added
