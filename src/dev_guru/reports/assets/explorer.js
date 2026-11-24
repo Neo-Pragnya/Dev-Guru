@@ -814,7 +814,7 @@
   function tourSteps() {
     const P = D.project, steps = [{ title: "Overview", text: `${P.name}: ${fmt(P.files)} files in ${fmt(P.packages)} packages, ${fmt(P.symbols)} classes and functions, ${fmt(P.loc)} lines.`, view: "constellation" }];
     [...D.packages].sort((a, b) => b.files.length - a.files.length).slice(0, 3).forEach((p) => steps.push({ title: "Package", text: `${p.id === "." ? "The root" : p.id} holds ${p.files.length} file${p.files.length === 1 ? "" : "s"}.`, view: "constellation", pkg: p.id }));
-    D.insights.entry_points.slice(0, 2).forEach((id) => steps.push({ title: "Entry point", text: `${files.get(id).path} looks like a way in: start reading here.`, view: "constellation", sel: id }));
+    D.insights.entry_points.slice(0, 2).forEach((id) => steps.push({ title: "Entry point", text: `${files.get(id).path} is where the program starts${files.get(id).entry_reason ? ` (${files.get(id).entry_reason})` : ""}: start reading here.`, view: "constellation", sel: id }));
     const top = D.insights.most_depended[0];
     if (top) steps.push({ title: "Most depended on", text: `${files.get(top).path} is imported by ${files.get(top).fan_in} files. A change here ripples furthest.`, view: "impact", sel: top });
     const big = D.insights.largest[0];

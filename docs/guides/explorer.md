@@ -103,7 +103,8 @@ on are where changes cost the most and tests matter most.
 
 ## ☄ Tour: show me around
 
-A narrated walk: the overview, the biggest packages, entry points, the most depended-on file, the largest file,
+A narrated walk: the overview, the biggest packages, entry points (where the program really starts: a Dockerfile or
+Procfile command, a console script, the module that creates the app, or a `__main__` block, never a test), the most depended-on file, the largest file,
 cycles, external dependencies, and finally what the map can't see. Use the arrow keys or the buttons; it pauses
 when you ask it to.
 
